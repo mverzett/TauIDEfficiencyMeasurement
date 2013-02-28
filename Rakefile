@@ -50,6 +50,12 @@ end
 ##     mm
 ################################################################################
 
+file "TauEffZMM.py" => ["TauEffBase.py"] do |t|
+  sh "touch #{t.name}"
+end
+file "TauEffZMT.py" => ["TauEffBase.py"] do |t|
+  sh "touch #{t.name}"
+end
 
 
 
