@@ -25,6 +25,8 @@ class TauEffBase(MegaBase):
             'Event_ID': lambda row, weight: (array.array("f", [row.run,row.lumi,int(row.evt)/10**5,int(row.evt)%10**5] ), None),
             }
         self.objId = {}
+        self.systematics = ['']
+        self.currect_systematic = ''
 
 
     def fill_histos(self, histos, folder, row, weight):
@@ -60,26 +62,10 @@ class TauEffBase(MegaBase):
     def count_bjets(self, row):
         return row.bjetCSVVeto
     
-    def build_tauid_folder_structure(self):
-        flag_map = {}
-        for obj_id_name in self.objId:
-            for sign in ['ss', 'os']:
-                for mt in ['HiMT','LoMT']:
-                    for nbjet in range(3):
-                        flag_map['/'.join((obj_id_name, sign, mt, 'bjets%s' % nbjet))] = {
-                            'obj_id' : {'fcn' : self.objId[obj_id_name] , 'val' : True},             #defined by derived class
-                            'sign'   : {'fcn' : self.sign_cut           , 'val' : (sign == 'os')},   #defined by derived class
-                            'mt_cut' : {'fcn' : self.is_MT_Low          , 'val' : (mt   == 'LoMT')}, #defined here
-                            'bjet_n' : {'fcn' : self.count_bjets        , 'val' : nbjet},            #defined here
-                            }
-                        
-                            #pprint.pprint( flag_map.keys())
-        return flag_map
-
 
     def begin(self):
         # Loop over regions, book histograms
-        for folder in self.build_tauid_folder_structure():
+        for folder in self.build_folder_structure():
             self.book_histos(folder) # defined in subclass
         for key in self.histograms:
             charpos  = key.rfind('/')
@@ -95,37 +81,40 @@ class TauEffBase(MegaBase):
         # For speed, map the result of the region cuts to a folder path
         # string using a dictionary
         # key = (sign, obj1, obj2, obj3)
-        cut_region_map = self.build_tauid_folder_structure()
+        cut_region_map = self.build_folder_structure()
 
         # Reduce number of self lookups and get the derived functions here
         histos       = self.histograms
         preselection = self.preselection
-        id_functions = dict( [ (name, fcn['fcn']) for name, fcn in cut_region_map[ cut_region_map.keys()[0] ].iteritems()] )
+        id_functions = self.id_functions
+        id_functions_with_sys = self.id_functions_with_sys
         fill_histos  = self.fill_histos
         weight_func  = self.event_weight
-
+        systematics  = self.systematics
 
         for row in self.tree:
             # Apply basic preselection
             if not preselection(row):
                 continue
 
-            row_id_map = dict( [ (name, fcn(row) )  for name, fcn in id_functions.iteritems()] )
-            # Get the generic event weight
-            event_weight = weight_func(row)
+            constant_id_map = dict( [ (name, fcn(row) )  for name, fcn in id_functions.iteritems()] )
+            for systematic in systematics:
+                self.currect_systematic = systematic
+                sys_id_map = dict( [ (name, fcn(row) )  for name, fcn in id_functions_with_sys.iteritems()] )
+                sys_id_map.update(constant_id_map)
+                # Get the generic event weight
+                event_weight = weight_func(row)
 
-            # Figure out which folder/region we are in, multiple regions allowed
-            for folder, selection in cut_region_map.iteritems():
-                try: 
-                    if all( [ (row_id_map[name] == info['val']) for name, info in selection.iteritems() if info['val'] is not None] ):
-                        #all cuts match the one of the region, None means the cut is not needed
-                        fill_histos(histos, folder, row, event_weight)
-                except KeyError:
-                    raise KeyError('problem in region: %s' % folder)
+                # Figure out which folder/region we are in, multiple regions allowed
+                for folder, selection in cut_region_map.iteritems():
+                    if folder.startswith(systematic): #Folder name starts with the systematic (if there are any)
+                        if all( [ (sys_id_map[name] == info ) for name, info in selection.iteritems() ] ):
+                            #all cuts match the one of the region, None means the cut is not needed
+                            fill_histos(histos, folder, row, event_weight)
 
     def finish(self):
         self.write_histos()
 
 if __name__ == "__main__":
     import pprint
-    pprint.pprint(TauEffBase.build_tauid_folder_structure())
+    pprint.pprint(TauEffBase.build_folder_structure())
