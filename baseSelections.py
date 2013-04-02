@@ -21,7 +21,7 @@ def tauSelection(row, name):
 
 def vetos(row):
     if row.muVetoPt5:         return False
-        #    if row.bjetCSVVeto:       return False
+    if row.bjetCSVVeto:       return False
     if row.tauVetoPt20:       return False
     if row.eVetoCicTightIso:  return False
     return True
