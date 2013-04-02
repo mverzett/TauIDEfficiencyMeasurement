@@ -8,4 +8,5 @@ source jobid.sh
 export jobid=$jobid7
 
 export jobid=$jobid8
-python TauEffPlotter.py
+python TauEffPlotterMT.py
+python TauEffPlotterMM.py
