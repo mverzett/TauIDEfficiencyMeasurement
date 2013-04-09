@@ -18,6 +18,12 @@ for dir in $datasrc; do
     rake "meta:getinputs[$jobid, $datasrc]"
     rake "meta:getmeta[inputs/$jobid, mm/metaInfo, 8]"
 done
+#clone the ZJets to have two samples: one matches only taus the onther the rest (mainly mu's)
+for file in $(ls inputs/$jobid/Zjet*); do
+    newname=`echo $file | sed 's|Zjets|Zjets_ZToMuMu|'`
+    cp -uv $file $newname
+done
+
 # Use the 7TeV WH samples for 8TeV
 #pushd inputs/$jobid/
 # Symlink the list of input files and the counts of the number of events.
