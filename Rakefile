@@ -24,10 +24,11 @@ end
 #puts get_sample_names('data_DoubleMu')
 
 samples = Hash[
-  "ewk" => Array['Zjets_M50', 'WplusJets_madgraph', 'TTplusJets_madgraph'],
+  "ewk" => Array['WplusJets_madgraph', 'TTplusJets_madgraph', 'Zjets_M50'],
   "wjets" => Array['WplusJets_madgraph'],
-  "zjets" => Array['Zjets_M50'],
-  # Automagically figure out what data samples we have
+  "zjets_clone" => Array['Zjets_ZToMuMu_M50'],
+  "zjets" => get_sample_names('Zjets'),
+  "diboson" => get_sample_names('ZZ')+get_sample_names('WZ') + get_sample_names('WW'),  # Automagically figure out what data samples we have
   "data_m" =>  get_sample_names("data_SingleMu"),
   "data_mm" =>  get_sample_names("data_DoubleMu"),
 ]
@@ -59,8 +60,8 @@ end
 
 
 
-mm_results = get_analyzer_results("TauEffZMM.py", samples['ewk'] + samples['data_mm'] + samples['data_m'])
-mt_results = get_analyzer_results("TauEffZMT.py", samples['ewk'] + samples['data_m'] )
+mm_results = get_analyzer_results("TauEffZMM.py", samples['ewk'] + samples['data_m'] + samples['diboson'])
+mt_results = get_analyzer_results("TauEffZMT.py", samples['ewk'] + samples['data_m'] + samples['diboson'] + samples["zjets_clone"])
 
 
 task :mm => mm_results
