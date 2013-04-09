@@ -24,10 +24,9 @@ if 'HWW3l' in os.environ.get('megatarget', 'NOTSET') and not is7TeV:
 mu_pog_2011_id             = MuonPOGCorrections.make_muon_pog_PFTight_2011()
 mu_pog_2011_iso            = MuonPOGCorrections.make_muon_pog_PFRelIsoDB02_2011()
 muon_pog_IsoID             = (lambda pt, eta: mu_pog_2011_id(pt,eta)*mu_pog_2011_iso(pt,eta)) if is7TeV else H2TauCorrections.correct_mu_idiso_2012
-electron_corrections       = H2TauCorrections.correct_e_idiso_2011 if is7TeV else H2TauCorrections.correct_e_idiso_2012
 
 #scale factors for single muon trigger
-muon_pog_Mu17Mu8_Mu17_2012 = MuonPOGCorrections.make_muon_pog_IsoMu24eta2p1_2012()
+muon_pog_IsoMu24eta2p1_2012 = MuonPOGCorrections.make_muon_pog_IsoMu24eta2p1_2012()
 
 #Double electrons does NOT need scale factors    
 
@@ -52,13 +51,5 @@ def get_muon_corrections(row,*args):
         ret *= muon_pog_IsoID( pt, eta)
     return ret
 
-def get_electron_corrections(row,*args):
-    'makes corrections to iso and id of electrons'
-    ret = 1.
-    for arg in args:
-        abseta = abs(getattr(row, '%sEta' % arg))
-        pt     = getattr(row, '%sPt'  % arg)
-        ret   *= electron_corrections(pt,abseta)
-    return ret
 
 
