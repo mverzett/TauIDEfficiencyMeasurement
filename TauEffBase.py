@@ -28,21 +28,20 @@ class TauEffBase(MegaBase):
         self.systematics = ['']
         self.currect_systematic = ''
 
-
     def fill_histos(self, histos, folder, row, weight):
         '''fills histograms'''
         #find all keys matching
         folder_str = folder
         for attr in self.histo_locations[folder_str]:
             value = self.histograms[folder_str+'/'+attr]
-            if isinstance(value, ROOT.TH2):
+            if value.InheritsFrom('TH2'):
                 if attr in self.hfunc:
-                    result, weight = self.hfunc[attr](row, weight)
+                    result, out_weight = self.hfunc[attr](row, weight)
                     r1, r2 = result
-                    if weight is None:
+                    if out_weight is None:
                         value.Fill( r1, r2 ) #saves you when filling NTuples!
                     else:
-                        value.Fill( r1, r2, weight )
+                        value.Fill( r1, r2, out_weight )
                 else:
                     attr1, attr2 = tuple(attr.split('#'))
                     v1 = getattr(row,attr1)
@@ -50,11 +49,11 @@ class TauEffBase(MegaBase):
                     value.Fill( v1, v2, weight ) if weight is not None else value.Fill( v1, v2 )
             else:
                 if attr in self.hfunc:
-                    result, weight = self.hfunc[attr](row, weight)
-                    if weight is None:
+                    result, out_weight = self.hfunc[attr](row, weight)
+                    if out_weight is None:
                         value.Fill( result ) #saves you when filling NTuples!
                     else:
-                        value.Fill( result, weight )
+                        value.Fill( result, out_weight )
                 else:
                     value.Fill( getattr(row,attr), weight ) if weight is not None else value.Fill( getattr(row,attr) )
         return None
@@ -99,8 +98,7 @@ class TauEffBase(MegaBase):
 
             constant_id_map = dict( [ (name, fcn(row) )  for name, fcn in id_functions.iteritems()] )
             for systematic in systematics:
-                self.currect_systematic = systematic
-                sys_id_map = dict( [ (name, fcn(row) )  for name, fcn in id_functions_with_sys.iteritems()] )
+                sys_id_map = dict( [ (name, fcn(row, systematic) )  for name, fcn in id_functions_with_sys.iteritems()] )
                 sys_id_map.update(constant_id_map)
                 # Get the generic event weight
                 event_weight = weight_func(row)
@@ -108,6 +106,8 @@ class TauEffBase(MegaBase):
                 # Figure out which folder/region we are in, multiple regions allowed
                 for folder, selection in cut_region_map.iteritems():
                     if folder.startswith(systematic): #Folder name starts with the systematic (if there are any)
+                        ## if 'QCD' in folder:
+                        ##     print folder, [ (name,(sys_id_map[name] == info )) for name, info in selection.iteritems() ]
                         if all( [ (sys_id_map[name] == info ) for name, info in selection.iteritems() ] ):
                             #all cuts match the one of the region, None means the cut is not needed
                             fill_histos(histos, folder, row, event_weight)
