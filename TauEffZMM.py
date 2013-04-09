@@ -80,9 +80,13 @@ class TauEffZMM(TauEffBase):
     def event_weight(self, row):
         if row.run > 2:
             return 1.
-        trigger_weight = mcCorrectors.muon_pog_Mu17Mu8_Mu17_2012(row.m1Pt, row.m1Eta) \
+        trigger_weight  = 1.
+        trigger_weight *= mcCorrectors.muon_pog_IsoMu24eta2p1_2012(row.m1Pt, row.m1Eta) \
             if row.m1MatchesIsoMu24eta2p1 else \
-            mcCorrectors.muon_pog_Mu17Mu8_Mu17_2012(row.m2Pt, row.m2Eta)
+            1.
+        trigger_weight *= mcCorrectors.muon_pog_IsoMu24eta2p1_2012(row.m2Pt, row.m2Eta) \
+            if row.m2MatchesIsoMu24eta2p1 else \
+            1.
         return self.pucorrector(row.nTruePU)*\
             mcCorrectors.get_muon_corrections(row,'m1','m2') * \
             trigger_weight
