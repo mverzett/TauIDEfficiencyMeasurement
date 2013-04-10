@@ -55,7 +55,7 @@ class TauEffZMT(TauEffBase):
             ## 'VLooseIso',
             ]
 
-        self.systematics  = ['NOSYS']#['NOSYS',"RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]#,'_m' add _m if needed also scaled down ['NOSYS']#
+        self.systematics  = ['NOSYS',"RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]#,'_m' add _m if needed also scaled down ['NOSYS']#['NOSYS']#
         self.id_functions = {
             'LooseIso'      : lambda row: bool(row.tLooseIso    ) ,
             'MediumIso'     : lambda row: bool(row.tMediumIso   ) ,
@@ -87,6 +87,12 @@ class TauEffZMT(TauEffBase):
             for obj_id_name in self.objId:
                 for sign in ['ss', 'os']:
                     for mt in ['HiMT','LoMT']:
+                        flag_map['/'.join((systematic,obj_id_name, sign, 'QCD', mt))] = {
+                            obj_id_name      : True            ,
+                            'sign_cut'       : (sign == 'os')  ,
+                            'is_MT_Low'      : (mt   == 'LoMT'),
+                            'is_mu_anti_iso' : True            ,
+                            }
                         flag_map['/'.join((systematic,obj_id_name, sign, mt))] = {
                             obj_id_name : True            ,
                             'sign_cut'  : (sign == 'os')  ,
@@ -119,7 +125,7 @@ class TauEffZMT(TauEffBase):
         self.book(directory, "mPt", "Muon 1 Pt", 100, 0, 100)
         self.book(directory, "tPt", "Muon 2 Pt", 100, 0, 100)
         self.book(directory, "mAbsEta", "Muon 1 eta", 100, 0, 5)
-        self.book(directory, "mMtToMET", "Muon 1 eta", 120, 0, 120)
+        self.book(directory, "mMtToPfMet_Ty1", " ", 200, 0, 400)
         self.book(directory, "tAbsEta", "Muon 2 eta", 100, 0, 5)
         self.book(directory, "m_t_Mass", "Muon 1-2 Mass", 150, 0, 150)
 
@@ -173,10 +179,11 @@ class TauEffZMT(TauEffBase):
 
         Excludes FR object IDs and sign cut.
         '''
-        if not row.isoMu24eta2p1Pass:             return False #if not row.mMatchesIsoMu24eta2p1:         return False #
+        if not (row.isoMu24eta2p1Pass and \
+                row.mMatchesIsoMu24eta2p1):       return False #if not row.mMatchesIsoMu24eta2p1:         return False #
         if not selections.muSelection(row, 'm'):  return False
         if not bool(row.mPFIDTight):              return False
-        if not self.muon_id(row):                 return False    
+            #if not self.muon_id(row):                 return False    
         if not selections.tauSelection(row, 't'): return False
         if not selections.vetos(row):             return False
         if not row.tAntiElectronLoose:            return False
