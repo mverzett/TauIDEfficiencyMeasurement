@@ -105,7 +105,9 @@ class TauEffZMM(TauEffBase):
 
         Excludes FR object IDs and sign cut.
         '''
-        if not (row.m1MatchesIsoMu24eta2p1 or row.m2MatchesIsoMu24eta2p1): return False
+        if not (row.isoMu24eta2p1Pass and \
+                (row.m1MatchesIsoMu24eta2p1 or row.m2MatchesIsoMu24eta2p1)\
+                ):                                    return False
         if not selections.muSelection(row, 'm1'):     return False
         if not selections.muSelection(row, 'm2', 10): return False
         if not self.muon1_id(row):                    return False    
