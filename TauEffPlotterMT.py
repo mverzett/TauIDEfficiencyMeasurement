@@ -62,13 +62,79 @@ class TauEffPlotterMT(TauEffPlotterBase):
     def __init__(self):
         super(TauEffPlotterMT, self).__init__('MT')
         self.systematic = 'NOSYS'
-        self.shape_systematics = []#['mes_p','tes_p','jes_p','ues_p']
+        self.shape_systematics = ['mes_p','tes_p','jes_p','ues_p']
+        #set the proper style
+        self.views['Zjets_ZToMuMu_M50']['view'] = views.TitleView(
+            views.StyleView(self.views['Zjets_ZToMuMu_M50']['view'], **data_styles['WW*']),
+            'Z#rightarrow#mu#mu'
+            )
+
+    def compute_contributions(self, iso_name):
+        '''uses ABCD method to extrapolate the WJets and QCD yield in SS region. Regions:
+        A - AntiIso objects LowMt
+        B - AntiIso objects HihgMt
+        C - Iso pass LowMt
+        D - Iso pass HighMt'''
+        data = self.get_view('data')
+        wjet = self.get_view('WplusJets*')
+        
+        qcd_ss_noIso_loMt = data.Get('ss/QCD/LoMT/mPt').Integral()
+        qcd_ss_noIso_hiMt = data.Get('ss/QCD/HiMT/mPt').Integral()
+        qcd_ratio_lo_hi_mt= qcd_ss_noIso_loMt / qcd_ss_noIso_hiMt
+
+        data_ss_Iso_loMt = data.Get('%s/ss/LoMT/mPt' % iso_name).Integral()
+        data_ss_Iso_hiMt = data.Get('%s/ss/HiMT/mPt' % iso_name).Integral()
+        
+        wjet_ss_Iso_loMt = wjet.Get('%s/ss/LoMT/mPt' % iso_name).Integral()
+        wjet_ss_Iso_hiMt = wjet.Get('%s/ss/HiMT/mPt' % iso_name).Integral()
+        w_ratio_lo_hi_mt = wjet_ss_Iso_loMt / wjet_ss_Iso_hiMt
+
+        qcd_yield_hiMt = (data_ss_Iso_hiMt*w_ratio_lo_hi_mt - data_ss_Iso_loMt)/(w_ratio_lo_hi_mt - qcd_ratio_lo_hi_mt)
+        qcd_yield_loMt = qcd_yield_hiMt*qcd_ratio_lo_hi_mt
+
+        return {
+            'LoMT' : {
+                'yield' : qcd_yield_loMt,
+                'view'  : views.TitleView(
+                    views.StyleView(
+                        views.ScaleView(
+                            views.SubdirectoryView(
+                                data,
+                                'ss/QCD/LoMT'
+                                ),
+                                qcd_yield_loMt/qcd_ss_noIso_loMt
+                                )
+                        , **data_styles['QCD*']),
+                        'QCD'),                        
+                },
+            'HiMT' : {
+                'yield' : qcd_yield_hiMt,
+                'view'  : views.TitleView(
+                    views.StyleView(
+                        views.ScaleView(
+                            views.SubdirectoryView(
+                                data,
+                                'ss/QCD/HiMT'
+                                ),
+                                qcd_yield_loMt/qcd_ss_noIso_hiMt
+                                )
+                        , **data_styles['QCD*']),
+                        'QCD'),
+                },
+            }
+        pass
+        
+        
         
     def get_w_estimation(self, iso_name, sign_region='os'):
         mt_h_name= 'mMtToPfMet_Ty1'
-        mtregion = 'VHiMT'
+        mtregion = 'HiMT'
         wjet_reg =  '/'.join((iso_name, sign_region, mtregion,''))
 
+        #qcd contribution
+        qcd_view = self.compute_contributions(iso_name)['HiMT']['view']
+        qcd_view = views.ScaleView(qcd_view, -1)
+        
         #Scale factor
         wjets_mc = self.get_view('WplusJets*')
         wjets_hi = wjets_mc.Get(wjet_reg+mt_h_name) 
@@ -83,6 +149,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         data_view= views.SubdirectoryView(self.get_view('data'),wjet_reg)
 
         wjet_est = views.SumView(data_view, neg_zjet)
+        wjet_est = views.SumView(wjet_est, qcd_view)
         wjet_est = views.ScaleView(wjet_est, w_scale)
         wjet_est = views.StyleView(wjet_est, **data_styles['WplusJets*'])
         wjet_est = views.TitleView(wjet_est, 'WplusJets')
@@ -146,6 +213,48 @@ class TauEffPlotterMT(TauEffPlotterBase):
             'QCD'      : qcd_est,
             'data'     : data,
             }
+
+    def plot_wjets_region(self, folder, variable, rebin=1, xaxis='', leftside=True,
+                        xrange=None, logscale=False, **kwargs):
+        iso_name    = folder.split('/')[0]
+        zjets_mc    = self.get_view_dir('Zjets_M50'  , rebin, folder)
+        data        = self.get_view_dir('data'       , rebin, folder)
+        ttbar       = self.get_view_dir('TTplusJets*', rebin, folder)
+        zjets_mm_mc = self.get_view_dir('Zjets_ZToMuMu_M50'  , rebin, folder)
+        wjets_mc    = self.get_view_dir('WplusJets*',  rebin, folder)
+        qcd_est     = self.rebin_view(self.compute_contributions(iso_name)['HiMT']['view'], rebin)
+        diboson     = views.TitleView(
+            views.StyleView(
+                views.SumView(
+                    self.get_view_dir('WZ*' , rebin, folder),
+                    self.get_view_dir('WW*' , rebin, folder),
+                    self.get_view_dir('ZZ*' , rebin, folder)
+                    ),
+                **data_styles['WZ*']
+            ),
+            'diboson'
+            )
+        mc_stack = views.StackView(ttbar, diboson, qcd_est, zjets_mm_mc, zjets_mc, wjets_mc).Get(variable)
+        mc_stack.Draw()
+        mc_stack.GetHistogram().GetXaxis().SetTitle(xaxis)
+        if xrange:
+            mc_stack.GetXaxis().SetRangeUser(xrange[0], xrange[1])
+            mc_stack.Draw()
+        self.keep.append(mc_stack)
+        data = self.rebin_view(self.get_view('data'), rebin).Get(os.path.join(folder,variable))
+        data.Draw('same')
+        self.keep.append(data)
+        # Make sure we can see everything
+        if data.GetMaximum() > mc_stack.GetMaximum():
+            mc_stack.SetMaximum(1.2*data.GetMaximum())
+        # Add legend
+        self.add_legend([data, mc_stack], leftside, entries=7)
+
+
+        if logscale:
+            self.canvas.SetLogy()
+        self.add_cms_blurb(self.sqrts)
+
 
     def plot_with_estimate(self, folder, variable, rebin=1, xaxis='', leftside=True, xrange=None, show_error=True):
         folder_views = self.make_folder_views(folder, rebin)
@@ -233,12 +342,15 @@ for iso in ids:
             plotter.set_subdir(folder)
             plotter.plot_mc_vs_data(folder, var, **kwargs)
             plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+            if 'HiMT' in folder:
+                plotter.plot_wjets_region(folder, var, **kwargs)
+                plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
             if 'os/LoMT' in folder:
                 plotter.plot_with_estimate(folder, var, **kwargs)
                 plotter.save('final_data_os_%s_%s_%s' % (iso, region, var) )
     plotter.set_subdir(iso)
     plotter.write_summary(iso,'m_t_Mass')
-    plotter.write_summary(iso,'mAbsEta')
+    #plotter.write_summary(iso,'mAbsEta')
             
 #Make QCD region plots
 for iso in ids:
@@ -249,10 +361,11 @@ for iso in ids:
         plotter.plot_mc_vs_data(folder, var, **kwargs)
         plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
 
-## integral_ss = plotter.views['data']['view'].Get('NOSYS/LooseIso/ss/QCD/mPt').Integral()
-## integral_os = plotter.views['data']['view'].Get('NOSYS/LooseIso/os/QCD/mPt').Integral()
+integral_ss = sum([plotter.views['data']['view'].Get('NOSYS/ss/QCD/%s/mPt' % m).Integral() for m in ['LoMT']])
+integral_os = sum([plotter.views['data']['view'].Get('NOSYS/os/QCD/%s/mPt' % m).Integral() for m in ['LoMT']])
+ratio_ss_os = integral_ss/integral_os
 
-## print '(ss = %.1f) / (os = %.1f) = .4f' % (integral_ss, integral_os)#, integral_ss/integral_os)
+print '(ss = %.1f +- %.1f) / (os = %.1f +- %.1f) = %.4f +- %.4f' % (integral_ss, math.sqrt(integral_ss), integral_os, math.sqrt(integral_os), ratio_ss_os, ratio_ss_os*quad(1./math.sqrt(integral_ss)+1./math.sqrt(integral_os)))
 
 #Make WJets region plots
 for iso in ids:
@@ -262,6 +375,8 @@ for iso in ids:
         plotter.set_subdir('/'.join([iso,'wjets']))
         plotter.plot_mc_vs_data(folder, var, **kwargs)
         plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+        plotter.plot_wjets_region(folder, var, **kwargs)
+        plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
 
 ## for syst in ["RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]:
 ##     plotter.systematic = syst
