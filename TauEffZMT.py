@@ -41,18 +41,18 @@ class TauEffZMT(TauEffBase):
 
         self.objId = [
             'LooseIso'    ,
-            ## 'MediumIso'   ,
-            ## 'TightIso'    , 
-            ## 'LooseMVAIso' ,
-            ## 'MediumMVAIso',
-            ## 'TightMVAIso' ,
-            ## 'LooseIso3Hits',
-            ## 'LooseMVA2Iso',
-            ## 'MediumIso3Hits',
-            ## 'MediumMVA2Iso',
-            ## 'TightIso3Hits',
-            ## 'TightMVA2Iso',
-            ## 'VLooseIso',
+            'MediumIso'   ,
+            'TightIso'    , 
+            'LooseMVAIso' ,
+            'MediumMVAIso',
+            'TightMVAIso' ,
+            'LooseIso3Hits',
+            'LooseMVA2Iso',
+            'MediumIso3Hits',
+            'MediumMVA2Iso',
+            'TightIso3Hits',
+            'TightMVA2Iso',
+            'VLooseIso',
             ]
 
         self.systematics  = ['NOSYS',"RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]#,'_m' add _m if needed also scaled down ['NOSYS']#['NOSYS']#
@@ -109,6 +109,7 @@ class TauEffZMT(TauEffBase):
                 for mt in ['HiMT','LoMT']:
                     #Make two region QCD dominated (anti-isolate the muon)
                     flag_map['/'.join((systematic, sign, 'QCD', mt))] = {
+                        'LooseIso'       : False         ,
                         'sign_cut'       : (sign == 'os'),
                         'is_MT_Low'      : (mt   == 'LoMT'),
                         'is_mu_anti_iso' : True,
@@ -192,9 +193,9 @@ class TauEffZMT(TauEffBase):
         #separate Z->tautau Z->mumu
         if 'Zjets' in os.environ['megatarget']:
             if 'ZToMuMu' in os.environ['megatarget']:
-                if row.tGenDecayMode >= 0: return False #matched to an hadronic tau
+                if row.isGtautau or row.isZtautau: return False
             else:
-                if row.tGenDecayMode < 0:  return False #matched to something that is not an hadronic tau
+                if not (row.isGtautau or row.isZtautau):  return False
                     
         return True
 
