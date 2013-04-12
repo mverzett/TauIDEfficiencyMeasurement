@@ -20,7 +20,10 @@ from FinalStateAnalysis.PlotTools.PoissonView import PoissonView
 from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, HistStackToTGRaphErrors
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
 from FinalStateAnalysis.MetaData.data_styles import data_styles
-import shelve
+from FinalStateAnalysis.StatTools.quad import quad
+#from FinalStateAnalysis.Utilities.shelve_wrapper  import make_shelf
+import json
+
 #from RecoLuminosity.LumiDB import argparse''' 
 import sys
 import os
@@ -33,10 +36,6 @@ import systematics
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptTitle(0)
-
-def quad(*xs):
-    return math.sqrt(sum(x*x for x in xs))
-
 
 class TauEffPlotterBase(Plotter):
     def __init__(self, channel):
@@ -63,7 +62,7 @@ class TauEffPlotterBase(Plotter):
             #key gets matched to the MC names
             '*' : {
                 #'*lumi'  : systematics.luminosity,
-                'trigger': systematics.mu_id_and_trigger,
+                #'trigger': systematics.mu_id_and_trigger,
                 },
             'Z*mumu' : {
                 'xsec' : systematics.Z_xsection,
@@ -98,7 +97,7 @@ class TauEffPlotterBase(Plotter):
 
     def write_summary(self, iso_name, variable, shape_only=False):
         ''' Write final cut-and-count table of events passing the selection '''
-        shelf     = shelve.open( os.path.join(self.outputdir,'summary_table_%s.raw_txt' % variable) )
+        store     = {} #make_shelf( os.path.join(self.outputdir,'summary_table_%s.raw_txt' % variable).replace('.raw_txt',''), flag='n' )
         sys_name  = self.systematic
         all_views = self.get_signal_views(iso_name, variable)
         sys_views = {}
@@ -136,20 +135,25 @@ class TauEffPlotterBase(Plotter):
             if len(sys_errors):
                 sys_err = quad(*sys_errors)
             if name == 'data':
+                store['bkg_sum'] = {
+                    'value' : sum(expected_evts['exp' ]),
+                    'stat'  : quad(*expected_evts['stat']),
+                    'sys'   : quad(*expected_evts['sys' ]),
+                    }
                 output += tab_form % ('Bkg. Sum', '%.1f' % sum(expected_evts['exp' ]), '%.1f' % quad(*expected_evts['stat']), '%.1f' % quad(*expected_evts['sys' ]))
                 sys_err = 0
             else:
                 expected_evts['exp' ].append(n_events)
                 expected_evts['stat'].append(stat_err)
                 expected_evts['sys' ].append(sys_err)
-            shelf[name] = {
-                'nevts' : n_events,
+            store[name] = {
+                'value' : n_events,
                 'stat'  : stat_err,
                 'sys'   : sys_err,
                 }
             output += tab_form % (name, '%.1f' % n_events, '%.1f' % hist.GetBinError(1), '%.1f' % sys_err)
 
-        shelf.close()
-        with open(os.path.join(self.outputdir,'summary_table_%s' % variable),'w') as out_file:
+        with open(os.path.join(self.outputdir,'summary_table_%s.raw_txt' % variable),'w') as out_file:
             out_file.write(output)
-
+        with open(os.path.join(self.outputdir,'summary_table_%s.json' % variable),'w') as out_file:
+            out_file.write(json.dumps(store, indent=4, separators=(',', ': ')))
