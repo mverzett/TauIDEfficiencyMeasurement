@@ -20,6 +20,7 @@ from FinalStateAnalysis.PlotTools.PoissonView import PoissonView
 from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, HistStackToTGRaphErrors
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
 from FinalStateAnalysis.MetaData.data_styles import data_styles
+from FinalStateAnalysis.StatTools.quad import quad
 from TauEffPlotterBase import TauEffPlotterBase
 import itertools
 import sys
@@ -34,9 +35,6 @@ import logging
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptTitle(0)
-
-def quad(*xs):
-    return math.sqrt(sum(x*x for x in xs))
 
 class SystematicsView(object):
     def __init__(self, central_view, *systematics_views):
@@ -320,18 +318,18 @@ print '\n\nPlotting MT\n\n'
 #pprint.pprint(plotter.views)
 ids =  [
             'LooseIso'    ,
-            ## 'MediumIso'   ,
-            ## 'TightIso'    , 
-            ## 'LooseMVAIso' ,
-            ## 'MediumMVAIso',
-            ## 'TightMVAIso' ,
-            ## 'LooseIso3Hits',
-            ## 'LooseMVA2Iso',
-            ## 'MediumIso3Hits',
-            ## 'MediumMVA2Iso',
-            ## 'TightIso3Hits',
-            ## 'TightMVA2Iso',
-            ## 'VLooseIso',
+            'MediumIso'   ,
+            'TightIso'    , 
+            'LooseMVAIso' ,
+            'MediumMVAIso',
+            'TightMVAIso' ,
+            'LooseIso3Hits',
+            'LooseMVA2Iso',
+            'MediumIso3Hits',
+            'MediumMVA2Iso',
+            'TightIso3Hits',
+            'TightMVA2Iso',
+            'VLooseIso',
     ]
 
 #Make Ztt WJets and TTbar region plots
