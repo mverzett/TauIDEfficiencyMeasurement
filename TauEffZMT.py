@@ -41,18 +41,18 @@ class TauEffZMT(TauEffBase):
 
         self.objId = [
             'LooseIso'    ,
-            'MediumIso'   ,
-            'TightIso'    , 
-            'LooseMVAIso' ,
-            'MediumMVAIso',
-            'TightMVAIso' ,
-            'LooseIso3Hits',
-            'LooseMVA2Iso',
-            'MediumIso3Hits',
-            'MediumMVA2Iso',
-            'TightIso3Hits',
-            'TightMVA2Iso',
-            'VLooseIso',
+            ## 'MediumIso'   ,
+            ## 'TightIso'    , 
+            ## 'LooseMVAIso' ,
+            ## 'MediumMVAIso',
+            ## 'TightMVAIso' ,
+            ## 'LooseIso3Hits',
+            ## 'LooseMVA2Iso',
+            ## 'MediumIso3Hits',
+            ## 'MediumMVA2Iso',
+            ## 'TightIso3Hits',
+            ## 'TightMVA2Iso',
+            ## 'VLooseIso',
             ]
 
         self.systematics  = ['NOSYS',"RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]#,'_m' add _m if needed also scaled down ['NOSYS']#['NOSYS']#
@@ -78,11 +78,13 @@ class TauEffZMT(TauEffBase):
         self.id_functions_with_sys = {
             'is_MT_Low'  : self.is_MT_Low,
             'is_MT_really_high': self.is_MT_really_high,
+            'is_MT_in_70_120' : self.is_MT_in_70_120,
             }
 
 
     def build_folder_structure(self):
         flag_map = {}
+        systematics = self.systematics if not os.environ['megatarget'].startswith('data_') else self.systematics[0] #for data no shifting sys applied, save time!
         for systematic in self.systematics:
             for obj_id_name in self.objId:
                 for sign in ['ss', 'os']:
@@ -105,14 +107,32 @@ class TauEffZMT(TauEffBase):
                         'sign_cut'    : True,
                         'is_MT_really_high' : True,
                         }
+                    flag_map['/'.join((systematic,obj_id_name, sign, 'MT70_120'))] = {
+                        obj_id_name : True,
+                        'sign_cut'    : True,
+                        'is_MT_in_70_120' : True,
+                        }
+                    
             for sign in ['ss', 'os']:
                 for mt in ['HiMT','LoMT']:
                     #Make two region QCD dominated (anti-isolate the muon)
-                    flag_map['/'.join((systematic, sign, 'QCD', mt))] = {
+                    flag_map['/'.join((systematic, 'QCD', sign, mt))] = {
                         'LooseIso'       : False         ,
                         'sign_cut'       : (sign == 'os'),
                         'is_MT_Low'      : (mt   == 'LoMT'),
                         'is_mu_anti_iso' : True,
+                        }
+                    flag_map['/'.join((systematic, 'QCD', sign, 'VHiMT'))] = {
+                        'LooseIso'       : False         ,
+                        'sign_cut'       : (sign == 'os'),
+                        'is_mu_anti_iso' : True,
+                        'is_MT_really_high' : True,
+                        }
+                    flag_map['/'.join((systematic, 'QCD', sign, 'MT70_120'))] = {
+                        'LooseIso'       : False         ,
+                        'sign_cut'       : (sign == 'os'),
+                        'is_mu_anti_iso' : True,
+                        'is_MT_in_70_120' : True,
                         }
         return flag_map
 
@@ -168,6 +188,10 @@ class TauEffZMT(TauEffBase):
 
     def is_MT_really_high(self, row, currect_systematic):
         return not self.is_MT_Less_than( row, 70, currect_systematic) #row.mMtToPfMet_Ty1 > 70 # #FIXME:BUGFINDING
+
+    def is_MT_in_70_120(self, row, currect_systematic):
+        return (not self.is_MT_Less_than( row, 70, currect_systematic)) and \
+            self.is_MT_Less_than( row, 120, currect_systematic)
 
     def muon_id(self, row):
         return ( row.mRelPFIsoDB < 0.1 or (row.mRelPFIsoDB < 0.15 and row.mAbsEta < 1.479))
