@@ -42,6 +42,7 @@ class TauEffPlotterBase(Plotter):
         self.jobid = os.environ['jobid']
         jobid = self.jobid
         self.samples = [ os.path.split(i)[1].split('.')[0] for i in glob.glob('results/%s/TauEffZ%s/*.root' % (jobid, channel))]
+        self.sample_file = glob.glob('results/%s/TauEffZ%s/*.root' % (jobid, channel))[0] #keep one file name, you will need it
         self.channel = channel
         self.period = '7TeV' if '7TeV' in jobid else '8TeV'
         self.sqrts = 7 if '7TeV' in jobid else 8
@@ -55,29 +56,13 @@ class TauEffPlotterBase(Plotter):
         #pprint.pprint(files)
         super(TauEffPlotterBase, self).__init__(files, lumifiles, self.outputdir, None)
         self.mc_samples = filter(lambda x: not x.startswith('data_'), self.samples)
+        self.zero_systematics_point = 'NOSYS' if channel=='MT' else ''
         self.systematic = ''
         self.shape_systematics = []
         #expressed in %
-        self.scale_systematics = {
-            #key gets matched to the MC names
-            '*' : {
-                #'*lumi'  : systematics.luminosity,
-                #'trigger': systematics.mu_id_and_trigger,
-                },
-            'Z*mumu' : {
-                'xsec' : systematics.Z_xsection,
-                },
-            'QCD' : {
-                'os_ss_ratio' : systematics.qcd_extrapolation,
-                },
-            'ttbar' : {
-                'xsec' : systematics.ttbar_xsection,
-                'btag_eff' : systematics.btag_efficiency,
-                },
-            }
 
     def get_view(self, *args): #Is it against Liskov Substitution Principle? I don't care
-        if self.systematic != '':
+        if self.systematic != '' or args[0] == 'data':
             return views.SubdirectoryView( super(TauEffPlotterBase, self).get_view(*args), self.systematic)
         else:
             return super(TauEffPlotterBase, self).get_view(*args)
@@ -97,11 +82,10 @@ class TauEffPlotterBase(Plotter):
 
     def write_summary(self, iso_name, variable, shape_only=False):
         ''' Write final cut-and-count table of events passing the selection '''
-        store     = {} #make_shelf( os.path.join(self.outputdir,'summary_table_%s.raw_txt' % variable).replace('.raw_txt',''), flag='n' )
+        store     = {} 
         sys_name  = self.systematic
         all_views = self.get_signal_views(iso_name, variable)
         sys_views = {}
-        print self.shape_systematics
         for sys in self.shape_systematics:
             self.systematic = sys
             sys_views[sys] = self.get_signal_views(iso_name, variable)
@@ -123,12 +107,12 @@ class TauEffPlotterBase(Plotter):
             shape_sys_events = [sys_views[sys][name].Get(variable).GetBinContent(1) for sys in self.shape_systematics]
             #makes abs difference
             sys_errors       = [abs(i-n_events) for i in shape_sys_events]
-            if not shape_only:
-                for key, item in self.scale_systematics.iteritems():
-                    if fnmatch.fnmatch(name,key):
-                        for sys_name, sys_effect in item.iteritems():
-                            print 'applying %s: %s to %s' % (key, sys_name, name)
-                            sys_errors.append(n_events*sys_effect)
+            ## if not shape_only:
+            ##     for key, item in self.scale_systematics.iteritems():
+            ##         if fnmatch.fnmatch(name,key):
+            ##             for sys_name, sys_effect in item.iteritems():
+            ##                 print 'applying %s: %s to %s' % (key, sys_name, name)
+            ##                 sys_errors.append(n_events*sys_effect)
                     
             #sum in quad
             sys_err = 0.
@@ -157,3 +141,94 @@ class TauEffPlotterBase(Plotter):
             out_file.write(output)
         with open(os.path.join(self.outputdir,'summary_table_%s.json' % variable),'w') as out_file:
             out_file.write(json.dumps(store, indent=4, separators=(',', ': ')))
+
+    def write_json_dump(self, variable):
+        ''' Write final cut-and-count table of events passing the selection '''
+
+        def GetContent(dir):
+            #print dir
+            tempList = dir.GetListOfKeys()
+            retList = []
+            for it in range(0,tempList.GetSize()):
+               retList.append(tempList.At(it).ReadObj())
+            return retList
+
+        def MapDirStructure( directory, dirName, objectList ):
+            dirContent = GetContent(directory)
+            for entry in dirContent:
+                if entry.InheritsFrom('TDirectory') or entry.InheritsFrom('TDirectoryFile'):
+                    subdirName = os.path.join(dirName,entry.GetName())
+                    MapDirStructure(entry, subdirName,objectList)
+                elif entry.InheritsFrom('TH1'):
+                    pathname = os.path.join(dirName,entry.GetName())
+                    objectList.append(pathname)
+
+        tfile  = ROOT.TFile.Open(self.sample_file)
+        print self.sample_file
+        histos = []
+        MapDirStructure(tfile,'',histos) #find all the histograms
+        tfile.Close()
+        #take only the ones that we are interested in 
+        histos = [i for i in histos if variable in i]
+        #all the histograms have the same number of bins, store it
+        nbins  = self.views['data']['view'].Get(histos[0]).GetNbinsX()
+        #remove the trailing directory (systematics)
+        if self.zero_systematics_point:
+            print 'chopping away the first dir'
+            histos = ['/'.join(i.split('/')[1:]) for i in histos]
+        #remove duplicates
+        histos = list( set( histos ) )
+
+        #where to store all the info
+        store     = {}
+
+        #move to nosys region
+        self.systematic = self.zero_systematics_point
+        #get all the available views
+        all_views = dict(
+            [
+                (name,
+                 self.rebin_view(self.get_view(name),nbins)
+                 ) for name in self.mc_samples+['data']
+                 ]
+            )
+        sys_views = {}
+        for sys in self.shape_systematics:
+            #move to that systematic
+            self.systematic = sys
+            #store the views
+            sys_views[sys] = dict(
+                [
+                    (name,
+                     self.rebin_view(self.get_view(name),nbins)
+                     ) for name in self.mc_samples+['data']
+                     ]
+                )
+
+        #now get the bin contents
+        for path in histos:
+            rerion_name        = path[:path.rfind('/')]
+            store[rerion_name] = {}
+            #loop on MC/data samples
+            for sample, view in all_views.iteritems():
+                histogram     = view.Get(path)
+                central_value = histogram.GetBinContent(1)
+                stat_error    = histogram.GetBinError(1)
+                #get all the central values sys shifted
+                sys_values    = [sys_views[sys][sample].Get(path).GetBinContent(1) for sys in self.shape_systematics]
+                #compute the difference
+                sys_values    = [abs(sys-central_value) for sys in sys_values]
+                sys_error     = quad(*sys_values) if sample != 'data' else 0.
+                store[rerion_name][sample] = {
+                    'val'  : central_value,
+                    'stat' : stat_error,
+                    'sys'  : sys_error,
+                    }
+
+        #write to file
+        with open(os.path.join(self.outputdir,'full_content_dump.json'),'w') as out_file:
+            out_file.write(json.dumps(store, indent=4, separators=(',', ': ')))
+ 
+        
+        
+        
