@@ -177,7 +177,9 @@ for var, kwargs in toPlot.iteritems():
         del kwargs['logscale']
         del kwargs['yrange']
 
+plotter.set_subdir('')
 plotter.write_summary('','m1_m2_Mass')
+#plotter.write_json_dump('m1_m2_Mass')
             
 #Make QCD region plots
 folder = folder.replace('os','ss')
