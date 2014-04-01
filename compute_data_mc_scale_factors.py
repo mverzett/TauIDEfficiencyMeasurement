@@ -32,7 +32,16 @@ def dict_ufloat(dictionary):
     for name, values in dictionary.iteritems():
         value     = values['value']
         stat_rel  = ufloat((1.,values['stat'] / values['value']),name+'_stat')
-        sys_rel   = ufloat((1.,values['sys'] / values['value']),name+'_sys')
+        sys_rel   = reduce(
+            lambda x, y: x*y,
+            [ ufloat(
+                (1.,sys_val / values['value']),
+                name+'_'+sysname)
+                for sysname, sys_val in values.iteritems()
+                if sysname.startswith('sys_')
+                ],
+            1.
+            )
         ret[name] = value*stat_rel*sys_rel
     return ret
 
@@ -50,8 +59,8 @@ def get_err(value, tag):
 ########################################################################################################################################################
 
 jobid              = os.environ['jobid']
-mumu_table_file    = [i for i in glob.glob('results/%s/plots/mm/signal/summary_table*' % jobid) if 'json' in i][0]
-mutau_table_files  = [i for i in glob.glob('results/%s/plots/mt/*/summary_table*' % jobid) if 'json' in i]
+mumu_table_file    = [i for i in glob.glob('results/%s/plots/mm/summary_table*.json' % jobid) if 'json' in i][0]
+mutau_table_files  = [i for i in glob.glob('results/%s/plots/mt/*/summary_table*.json' % jobid) if 'json' in i]
 output_dir         = 'results/%s/plots/' % jobid
 mumu_table         = dict_ufloat(
     json.loads(
@@ -74,6 +83,8 @@ mutau_tables       = dict(
      ]
     )
 
+for iso in mutau_tables:
+    mutau_tables[iso]['QCD'] *= ufloat((1,0.1), 'qcd_extrapolation_stat')
 
 ########################################################################################################################################################
 ######################################                                                                            ######################################
@@ -118,7 +129,7 @@ def get_table_entry(proc_name, dictionary, ratio, efficiency=None):
 ######################################                                                                            ######################################
 ########################################################################################################################################################
 
-def compute_data_MC_Ratio(dictionary):
+def compute_data_MC_Ratio(dictionary, refsample = 'Z_jets'):
     #pprint(dictionary)
     return dictionary['data'] / dictionary['bkg_sum']
 
@@ -146,9 +157,9 @@ mc_bkg_mumu = sum(
        ]
     )
 
-muon_id     = 1.*ufloat((1,0.001),'muon_id_sys')
-muon_iso    = 0.984*ufloat((1,0.006/0.984),'muon_iso_sys')
-muon_trig   = 0.981*ufloat((1,0.006/0.981),'muon_trg_sys')
+## muon_id     = 1.*ufloat((1,0.001),'muon_id_sys')
+## muon_iso    = 0.984*ufloat((1,0.006/0.984),'muon_iso_sys')
+## muon_trig   = 0.981*ufloat((1,0.006/0.981),'muon_trg_sys')
 
 for iso_name, table in mutau_tables.iteritems():
     data_mutau   = table['data']
@@ -162,9 +173,13 @@ for iso_name, table in mutau_tables.iteritems():
     ## print '(data_mumu - mc_bkg_mumu)', (data_mumu - mc_bkg_mumu)
     ## print '(mc_mumu/mc_mutau)', (mc_mumu/mc_mutau)
     eff = ((data_mutau - mc_bkg_mutau) / (data_mumu - mc_bkg_mumu)) * \
-       (mc_mumu/mc_mutau) *\
-       muon_id*muon_iso*(2-muon_trig)
+        (mc_mumu/mc_mutau)
+       
+    ## if iso_name == 'LooseIso':
+    ##     for (var, error) in eff.error_components().items():
+    ##         print "%s: %f" % (var.tag, error)
     toprint      += get_table_entry(iso_name,table,mutau_data_mc_ratios[iso_name],eff)
+    
 
     
 

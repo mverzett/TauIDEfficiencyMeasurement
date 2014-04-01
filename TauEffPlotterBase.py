@@ -58,12 +58,16 @@ class TauEffPlotterBase(Plotter):
         self.mc_samples = filter(lambda x: not x.startswith('data_'), self.samples)
         self.zero_systematics_point = 'NOSYS' if channel=='MT' else ''
         self.systematic = ''
+        self.zero_systematic = ''
         self.shape_systematics = []
         #expressed in %
 
     def get_view(self, *args): #Is it against Liskov Substitution Principle? I don't care
-        if self.systematic != '' or args[0] == 'data':
-            return views.SubdirectoryView( super(TauEffPlotterBase, self).get_view(*args), self.systematic)
+        if self.systematic != '':
+            toget = self.systematic
+            if args[0] == 'data' or (not self.systematic.endswith('es_p')):
+                toget = self.zero_systematic
+            return views.SubdirectoryView( super(TauEffPlotterBase, self).get_view(*args), toget)
         else:
             return super(TauEffPlotterBase, self).get_view(*args)
 
@@ -104,37 +108,31 @@ class TauEffPlotterBase(Plotter):
             n_events= hist.GetBinContent(1)
             stat_err= hist.GetBinError(1)
             #compute nevents shape_systematics
-            shape_sys_events = [sys_views[sys][name].Get(variable).GetBinContent(1) for sys in self.shape_systematics]
+            shape_sys_events = [(sys, sys_views[sys][name].Get(variable).GetBinContent(1)) for sys in self.shape_systematics]
             #makes abs difference
-            sys_errors       = [abs(i-n_events) for i in shape_sys_events]
-            ## if not shape_only:
-            ##     for key, item in self.scale_systematics.iteritems():
-            ##         if fnmatch.fnmatch(name,key):
-            ##             for sys_name, sys_effect in item.iteritems():
-            ##                 print 'applying %s: %s to %s' % (key, sys_name, name)
-            ##                 sys_errors.append(n_events*sys_effect)
+            sys_errors       = [('sys_'+sys, abs(i-n_events)) for sys, i in shape_sys_events]
+            sys_err          = quad(*[i for _, i in sys_errors])
                     
-            #sum in quad
-            sys_err = 0.
-            if len(sys_errors):
-                sys_err = quad(*sys_errors)
             if name == 'data':
                 store['bkg_sum'] = {
                     'value' : sum(expected_evts['exp' ]),
                     'stat'  : quad(*expected_evts['stat']),
                     'sys'   : quad(*expected_evts['sys' ]),
                     }
-                output += tab_form % ('Bkg. Sum', '%.1f' % sum(expected_evts['exp' ]), '%.1f' % quad(*expected_evts['stat']), '%.1f' % quad(*expected_evts['sys' ]))
-                sys_err = 0
+                output    += tab_form % ('Bkg. Sum', '%.1f' % sum(expected_evts['exp' ]), '%.1f' % quad(*expected_evts['stat']), '%.1f' % quad(*expected_evts['sys' ]))
+                sys_errors = []
+                sys_err    = 0.
             else:
                 expected_evts['exp' ].append(n_events)
                 expected_evts['stat'].append(stat_err)
                 expected_evts['sys' ].append(sys_err)
-            store[name] = {
+
+            entry = {
                 'value' : n_events,
                 'stat'  : stat_err,
-                'sys'   : sys_err,
                 }
+            entry.update(dict(sys_errors))
+            store[name] = entry
             output += tab_form % (name, '%.1f' % n_events, '%.1f' % hist.GetBinError(1), '%.1f' % sys_err)
 
         with open(os.path.join(self.outputdir,'summary_table_%s.raw_txt' % variable),'w') as out_file:
@@ -217,7 +215,7 @@ class TauEffPlotterBase(Plotter):
                 #get all the central values sys shifted
                 sys_values    = [sys_views[sys][sample].Get(path).GetBinContent(1) for sys in self.shape_systematics]
                 #compute the difference
-                sys_values    = [abs(sys-central_value) for sys in sys_values]
+                sys_values    = [abs(sys-central_value) for name, sys in sys_values]
                 sys_error     = quad(*sys_values) if sample != 'data' else 0.
                 store[rerion_name][sample] = {
                     'val'  : central_value,

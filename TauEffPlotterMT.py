@@ -60,7 +60,8 @@ class TauEffPlotterMT(TauEffPlotterBase):
     def __init__(self):
         super(TauEffPlotterMT, self).__init__('MT')
         self.systematic = 'NOSYS'
-        self.shape_systematics = ['mes_p','tes_p','jes_p','ues_p']
+        self.zero_systematic = 'NOSYS'
+        self.shape_systematics = ['mes_p','tes_p','jes_p','ues_p','qcd_scale_down']
         #set the proper style
         self.views['Zjets_ZToMuMu_M50']['view'] = views.TitleView(
             views.StyleView(self.views['Zjets_ZToMuMu_M50']['view'], **data_styles['WW*']),
@@ -76,8 +77,8 @@ class TauEffPlotterMT(TauEffPlotterBase):
         data = self.get_view('data')
         wjet = self.get_view('WplusJets*')
         
-        qcd_ss_noIso_loMt = data.Get('ss/QCD/LoMT/mPt').Integral()
-        qcd_ss_noIso_hiMt = data.Get('ss/QCD/%s/mPt' % himtregion).Integral()
+        qcd_ss_noIso_loMt = data.Get('QCD/ss/LoMT/mPt').Integral()
+        qcd_ss_noIso_hiMt = data.Get('QCD/ss/%s/mPt' % himtregion).Integral()
         qcd_ratio_lo_hi_mt= qcd_ss_noIso_loMt / qcd_ss_noIso_hiMt
 
         data_ss_Iso_loMt = data.Get('%s/ss/LoMT/mPt' % iso_name).Integral()
@@ -87,7 +88,6 @@ class TauEffPlotterMT(TauEffPlotterBase):
         wjet_ss_Iso_hiMt = wjet.Get('%s/ss/%s/mPt' % (iso_name, himtregion)).Integral()
         w_ratio_lo_hi_mt = wjet_ss_Iso_loMt / wjet_ss_Iso_hiMt
 
-        print himtregion, data_ss_Iso_hiMt, w_ratio_lo_hi_mt, data_ss_Iso_loMt, (w_ratio_lo_hi_mt - qcd_ratio_lo_hi_mt)
         qcd_yield_hiMt = (data_ss_Iso_hiMt*w_ratio_lo_hi_mt - data_ss_Iso_loMt)/(w_ratio_lo_hi_mt - qcd_ratio_lo_hi_mt)
         qcd_yield_loMt = qcd_yield_hiMt*qcd_ratio_lo_hi_mt
 
@@ -99,7 +99,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
                         views.ScaleView(
                             views.SubdirectoryView(
                                 data,
-                                'ss/QCD/LoMT'
+                                'QCD/ss/LoMT'
                                 ),
                                 qcd_yield_loMt/qcd_ss_noIso_loMt
                                 )
@@ -113,7 +113,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
                         views.ScaleView(
                             views.SubdirectoryView(
                                 data,
-                                'ss/QCD/HiMT'
+                                'QCD/ss/%s' % himtregion
                                 ),
                                 qcd_yield_loMt/qcd_ss_noIso_hiMt
                                 )
@@ -121,8 +121,6 @@ class TauEffPlotterMT(TauEffPlotterBase):
                         'QCD'),
                 },
             }
-        pass
-        
         
         
     def get_w_estimation(self, iso_name, mtregion, sign_region='os'):
@@ -132,7 +130,8 @@ class TauEffPlotterMT(TauEffPlotterBase):
 
         #qcd contribution
         qcd_view = self.compute_contributions(iso_name, mtregion)[mtregion]['view']
-        qcd_view = views.ScaleView(qcd_view, -1)
+        qcd_scale= -0.9 if self.systematic == 'qcd_scale_down' else -1.
+        qcd_view = views.ScaleView(qcd_view, qcd_scale)
         
         #Scale factor
         wjets_mc = self.get_view('WplusJets*')
@@ -202,7 +201,8 @@ class TauEffPlotterMT(TauEffPlotterBase):
         wjet_est  = self.rebin_view(self.get_w_estimation(iso_name, mtregion), rebin)
         
         #makes QCD Estimation view
-        qcd_est   = self.rebin_view(self.get_qcd_estimation(iso_name, mtregion), rebin)
+        qcd_scale = 0.9 if self.systematic == 'qcd_scale_down' else 1.
+        qcd_est   = views.ScaleView( self.rebin_view(self.get_qcd_estimation(iso_name, mtregion), rebin), qcd_scale)
         return {
             'Z_tautau' : zjets_mc,
             'Z_mumu'   : zjets_mm_mc,
@@ -222,7 +222,12 @@ class TauEffPlotterMT(TauEffPlotterBase):
         ttbar       = self.get_view_dir('TTplusJets*', rebin, folder)
         zjets_mm_mc = self.get_view_dir('Zjets_ZToMuMu_M50'  , rebin, folder)
         wjets_mc    = self.get_view_dir('WplusJets*',  rebin, folder)
-        qcd_est     = self.rebin_view(self.compute_contributions(iso_name, mtregion)[mtregion]['view'], rebin)
+        qcd_scale   = 0.9 if self.systematic == 'qcd_scale_down' else 1.
+        qcd_est     = views.ScaleView(
+            self.rebin_view(
+                self.compute_contributions(iso_name, mtregion)[mtregion]['view'],
+                rebin),
+            qcd_scale)
         diboson     = views.TitleView(
             views.StyleView(
                 views.SumView(
@@ -254,6 +259,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         if logscale:
             self.canvas.SetLogy()
         self.add_cms_blurb(self.sqrts)
+        return data.Integral(), sum(mc_stack.GetHists()).Integral()
 
 
     def plot_with_estimate(self, folder, variable, rebin=1, xaxis='', leftside=True, xrange=None, show_error=True):
@@ -321,18 +327,18 @@ print '\n\nPlotting MT\n\n'
 
 ids =  [
             'LooseIso'    ,
-            'MediumIso'   ,
-            'TightIso'    , 
-            'LooseMVAIso' ,
-            'MediumMVAIso',
-            'TightMVAIso' ,
-            'LooseIso3Hits',
-            'LooseMVA2Iso',
-            'MediumIso3Hits',
-            'MediumMVA2Iso',
-            'TightIso3Hits',
-            'TightMVA2Iso',
-            'VLooseIso',
+            ## 'MediumIso'   ,
+            ## 'TightIso'    , 
+            ## 'LooseMVAIso' ,
+            ## 'MediumMVAIso',
+            ## 'TightMVAIso' ,
+            ## 'LooseIso3Hits',
+            ## 'LooseMVA2Iso',
+            ## 'MediumIso3Hits',
+            ## 'MediumMVA2Iso',
+            ## 'TightIso3Hits',
+            ## 'TightMVA2Iso',
+            ## 'VLooseIso',
     ]
 
 #Make Ztt WJets and TTbar region plots
@@ -343,7 +349,6 @@ for iso in ids:
         plotter.set_subdir(os.path.join(iso, 'signal'))
         plotter.plot_mc_vs_data(folder, var, **kwargs)
         plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
-        print 'plot_with_estimate: ',folder, var
         plotter.plot_with_estimate(folder, var, **kwargs)
         plotter.save('final_data_os_%s_%s_%s' % (iso, region, var) )
     plotter.set_subdir(iso)
@@ -355,14 +360,18 @@ for iso in ids:
             ('VHiMT', 'MT_Greater_70'),
             ('MT70_120', 'MT_70_120'),
             ]:
+        first = True
         for var, kwargs in toPlot.iteritems():
             plotter.set_subdir(os.path.join(iso, dirname))
             folder = '/'.join([iso,'os',region])
             plotter.plot_mc_vs_data(folder, var, **kwargs)
             plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
-            print 'plot_wjets_region: ',folder, var
-            plotter.plot_wjets_region(folder, var, **kwargs)
+            obs_evt, exp_evt = plotter.plot_wjets_region(folder, var, **kwargs)
             plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
+            if first:
+                print '%s: observed events: %.0f expected: %.1f ratio: %.3f' % (dirname, obs_evt, exp_evt, obs_evt/ exp_evt)
+                first=False
+            
 
 
 plotter.set_subdir('')
@@ -378,8 +387,8 @@ for iso in ids:
         plotter.plot_mc_vs_data(folder, var, **kwargs)
         plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
 
-integral_ss = sum([plotter.views['data']['view'].Get('NOSYS/ss/QCD/%s/mPt' % m).Integral() for m in ['LoMT']])
-integral_os = sum([plotter.views['data']['view'].Get('NOSYS/os/QCD/%s/mPt' % m).Integral() for m in ['LoMT']])
+integral_ss = sum([plotter.views['data']['view'].Get('NOSYS/QCD/ss/%s/mPt' % m).Integral() for m in ['LoMT']])
+integral_os = sum([plotter.views['data']['view'].Get('NOSYS/QCD/os/%s/mPt' % m).Integral() for m in ['LoMT']])
 ratio_ss_os = integral_ss/integral_os
 
 print '(ss = %.1f +- %.1f) / (os = %.1f +- %.1f) = %.4f +- %.4f' % (integral_ss, math.sqrt(integral_ss), integral_os, math.sqrt(integral_os), ratio_ss_os, ratio_ss_os*quad(1./math.sqrt(integral_ss)+1./math.sqrt(integral_os)))

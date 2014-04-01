@@ -38,8 +38,8 @@ class TauEffZMM(TauEffBase):
         
         self.id_functions_with_sys = {
             }
-        self.hfunc['MET_Z_perp'] = lambda row, weight: (row.type1_pfMetEt*ROOT.TMath.Cos(row.m1_m2_ToMETDPhi), weight)
-        self.hfunc['MET_Z_para'] = lambda row, weight: (row.type1_pfMetEt*ROOT.TMath.Sin(row.m1_m2_ToMETDPhi), weight)
+        self.hfunc['MET_Z_perp'] = lambda row, weight: (row.type1_pfMetEt*ROOT.TMath.Cos(row.m1_m2_ToMETDPhi_Ty1), weight)
+        self.hfunc['MET_Z_para'] = lambda row, weight: (row.type1_pfMetEt*ROOT.TMath.Sin(row.m1_m2_ToMETDPhi_Ty1), weight)
 
     def build_folder_structure(self):
         flag_map = {}
