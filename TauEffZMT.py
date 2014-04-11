@@ -40,37 +40,62 @@ class TauEffZMT(TauEffBase):
             return _f
 
         self.objId = [
-            'LooseIso'    ,
-            ## 'MediumIso'   ,
-            ## 'TightIso'    , 
-            ## 'LooseMVAIso' ,
-            ## 'MediumMVAIso',
-            ## 'TightMVAIso' ,
-            ## 'LooseIso3Hits',
-            ## 'LooseMVA2Iso',
-            ## 'MediumIso3Hits',
-            ## 'MediumMVA2Iso',
-            ## 'TightIso3Hits',
-            ## 'TightMVA2Iso',
-            ## 'VLooseIso',
+            'VLooseIso' 	           ,
+            'LooseIso'  	           ,
+            'MediumIso' 	           ,
+            'TightIso'  	           ,
+            'LooseIso3Hits'                ,
+            'LooseIso3HitsAntiEleLoose'    ,
+            'LooseIso3HitsAntiEleMVAVLoose',
+            'LooseIso3HitsAntiEleMVALoose' ,
+            'LooseIso3HitsAntiEleMVAMedium',
+            'LooseIso3HitsAntiEleMVATight' ,
+            'LooseIso3HitsAntiMuon3Tight'  ,
+            'LooseIso3HitsAntiMuonMVATight',
+            'MediumIso3Hits' 	           ,
+            'TightIso3Hits'                ,
+            'VLooseIsoMVA3OldDMNoLT'       ,
+            'LooseIsoMVA3OldDMNoLT'        ,
+            'MediumIsoMVA3OldDMNoLT'       ,
+            'TightIsoMVA3OldDMNoLT'        ,
+            'VTightIsoMVA3OldDMNoLT'       ,
+            'VVTightIsoMVA3OldDMNoLT'      ,
+            'VLooseIsoMVA3OldDMLT'         ,
+            'LooseIsoMVA3OldDMLT'          ,
+            'MediumIsoMVA3OldDMLT'         ,
+            'TightIsoMVA3OldDMLT'          ,
+            'VTightIsoMVA3OldDMLT'         ,
+            'VVTightIsoMVA3OldDMLT'        ,
             ]
 
         self.systematics  = ['NOSYS',"RAW"]+[i+j for i,j in itertools.product(['mes','tes','jes','ues'],['_p'])]#,'_m' add _m if needed also scaled down ['NOSYS']#['NOSYS']#
         self.id_functions = {
-            'LooseIso'      : lambda row: bool(row.tLooseIso    ) ,
-            'MediumIso'     : lambda row: bool(row.tMediumIso   ) ,
-            'TightIso'      : lambda row: bool(row.tTightIso    ) ,
-            'LooseMVAIso'   : lambda row: bool(row.tLooseMVAIso ) ,
-            'MediumMVAIso'  : lambda row: bool(row.tMediumMVAIso) ,
-            'TightMVAIso'   : lambda row: bool(row.tTightMVAIso ) ,
-            'LooseIso3Hits' : lambda row: bool(row.tLooseIso3Hits ),
-            'LooseMVA2Iso'  : lambda row: bool(row.tLooseMVA2Iso  ),
-            'MediumIso3Hits': lambda row: bool(row.tMediumIso3Hits),
-            'MediumMVA2Iso' : lambda row: bool(row.tMediumMVA2Iso ),
-            'TightIso3Hits' : lambda row: bool(row.tTightIso3Hits ),
-            'TightMVA2Iso'  : lambda row: bool(row.tTightMVA2Iso  ),
-            'VLooseIso'     : lambda row: bool(row.tVLooseIso     ),
-            'sign_cut'      : self.sign_cut,
+            'VLooseIso' 	            : lambda row: bool(row.tDecayFinding) and bool(row.tVLooseIso),
+            'LooseIso'  	            : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso), 
+            'MediumIso' 	            : lambda row: bool(row.tDecayFinding) and bool(row.tMediumIso),
+            'TightIso'  	            : lambda row: bool(row.tDecayFinding) and bool(row.tTightIso), 
+            'LooseIso3Hits'                 : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits),	
+            'LooseIso3HitsAntiEleLoose'     : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiElectronLoose),
+            'LooseIso3HitsAntiEleMVAVLoose' : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiElectronMVA5VLoose),
+            'LooseIso3HitsAntiEleMVALoose'  : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiElectronMVA5Loose), 
+            'LooseIso3HitsAntiEleMVAMedium' : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiElectronMVA5Medium),
+            'LooseIso3HitsAntiEleMVATight'  : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiElectronMVA5Tight), 
+            'LooseIso3HitsAntiMuon3Tight'   : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiMuon3Tight),
+            'LooseIso3HitsAntiMuonMVATight' : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIso3Hits) and bool(row.tAntiMuonMVATight),
+            'MediumIso3Hits' 	            : lambda row: bool(row.tDecayFinding) and bool(row.tMediumIso3Hits),
+            'TightIso3Hits'                 : lambda row: bool(row.tDecayFinding) and bool(row.tTightIso3Hits), 
+            'VLooseIsoMVA3OldDMNoLT'        : lambda row: bool(row.tDecayFinding) and bool(row.tVLooseIsoMVA3OldDMNoLT), 	
+            'LooseIsoMVA3OldDMNoLT'         : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIsoMVA3OldDMNoLT),  	
+            'MediumIsoMVA3OldDMNoLT'        : lambda row: bool(row.tDecayFinding) and bool(row.tMediumIsoMVA3OldDMNoLT), 	
+            'TightIsoMVA3OldDMNoLT'         : lambda row: bool(row.tDecayFinding) and bool(row.tTightIsoMVA3OldDMNoLT),  	
+            'VTightIsoMVA3OldDMNoLT'        : lambda row: bool(row.tDecayFinding) and bool(row.tVTightIsoMVA3OldDMNoLT), 	
+            'VVTightIsoMVA3OldDMNoLT'       : lambda row: bool(row.tDecayFinding) and bool(row.tVVTightIsoMVA3OldDMNoLT),	
+            'VLooseIsoMVA3OldDMLT'          : lambda row: bool(row.tDecayFinding) and bool(row.tVLooseIsoMVA3OldDMLT), 
+            'LooseIsoMVA3OldDMLT'           : lambda row: bool(row.tDecayFinding) and bool(row.tLooseIsoMVA3OldDMLT),  
+            'MediumIsoMVA3OldDMLT'          : lambda row: bool(row.tDecayFinding) and bool(row.tMediumIsoMVA3OldDMLT), 
+            'TightIsoMVA3OldDMLT'           : lambda row: bool(row.tDecayFinding) and bool(row.tTightIsoMVA3OldDMLT),  
+            'VTightIsoMVA3OldDMLT'          : lambda row: bool(row.tDecayFinding) and bool(row.tVTightIsoMVA3OldDMLT), 
+            'VVTightIsoMVA3OldDMLT'         : lambda row: bool(row.tDecayFinding) and bool(row.tVVTightIsoMVA3OldDMLT),            'sign_cut'      : self.sign_cut,
             'muon_id'       : self.muon_id,
             'is_mu_anti_iso': self.is_mu_anti_iso,
             }
@@ -154,15 +179,19 @@ class TauEffZMT(TauEffBase):
         self.book(directory, 'bjetVeto', 'Number of b-jets', 5, -0.5, 4.5)
         self.book(directory, 'bjetCSVVeto', 'Number of b-jets', 5, -0.5, 4.5)
         self.book(directory, 'muVetoPt5', 'Number of extra muons', 5, -0.5, 4.5)
-        self.book(directory, 'tauVetoPt20', 'Number of extra taus', 5, -0.5, 4.5)
+        self.book(directory, 'tauVetoPt20Loose3HitsVtx', 'Number of extra taus', 5, -0.5, 4.5)
         self.book(directory, 'eVetoCicTightIso', 'Number of extra CiC tight electrons', 5, -0.5, 4.5)
             
     def event_weight(self, row):
         if row.run > 2:
             return 1.
-        return self.pucorrector(row.nTruePU) * \
-            mcCorrectors.get_muon_corrections(row,'m') * \
-            mcCorrectors.muon_pog_IsoMu24eta2p1_2012(row.mPt, row.mEta)
+        weight = row.tauSpinnerWeight if 'TauSpinned' in os.environ['megatarget'] else 1.
+
+        return weight *\
+            self.pucorrector(row.nTruePU) * \
+            mcCorrectors.muon_pog_PFTight(row.mPt, row.mEta) * \
+            mcCorrectors.muon_pog_Iso(row.mPt, row.mEta) * \
+            mcCorrectors.muon_pog_IsoMu24eta2p1(row.mPt, row.mEta)
 
     def sign_cut(self, row):
         return not row.m_t_SS
@@ -194,10 +223,10 @@ class TauEffZMT(TauEffBase):
             self.is_MT_Less_than( row, 120, currect_systematic)
 
     def muon_id(self, row):
-        return ( row.mRelPFIsoDB < 0.1 or (row.mRelPFIsoDB < 0.15 and row.mAbsEta < 1.479))
+        return selections.mu_idIso(row, 'm') 
 
     def is_mu_anti_iso(self, row):
-        return row.mRelPFIsoDB > 0.2 and row.mRelPFIsoDB < 0.5
+        return row.mRelPFIsoDBDefault > 0.2 and row.mRelPFIsoDBDefault < 0.5
 
     def preselection(self, row):
         ''' Preselection applied to events.
@@ -205,15 +234,15 @@ class TauEffZMT(TauEffBase):
         Excludes FR object IDs and sign cut.
         '''
         if not (row.isoMu24eta2p1Pass and \
-                row.mMatchesIsoMu24eta2p1):       return False #if not row.mMatchesIsoMu24eta2p1:         return False #
-        if not selections.muSelection(row, 'm'):  return False
-        if not bool(row.mPFIDTight):              return False
-            #if not self.muon_id(row):                 return False    
-        if not selections.tauSelection(row, 't'): return False
-        if not selections.vetos(row):             return False
-        if not row.tAntiElectronLoose:            return False
-        if not row.tAntiMuonTight:                return False
+                row.mMatchesIsoMu24eta2p1):          return False #if not row.mMatchesIsoMu24eta2p1:         return False #
+        if not selections.muSelection(row, 'm'):     return False
+        if not (row.mPt > 25 and row.mAbsEta < 2.1): return False
+        if not bool(row.mPFIDTight):                 return False
+        if not selections.tauSelection(row, 't'):    return False
+        if row.tMuOverlap > 0:                       return False
+        if not selections.vetos(row):                return False
         if row.m_t_Mass > 150:                    return False
+
         #separate Z->tautau Z->mumu
         if 'Zjets' in os.environ['megatarget']:
             if 'ZToMuMu' in os.environ['megatarget']:
