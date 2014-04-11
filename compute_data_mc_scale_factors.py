@@ -31,11 +31,12 @@ def dict_ufloat(dictionary):
     ret = {}
     for name, values in dictionary.iteritems():
         value     = values['value']
-        stat_rel  = ufloat((1.,values['stat'] / values['value']),name+'_stat')
+        stat_rel  = ufloat(1., values['stat'] / values['value'], name+'_stat')
         sys_rel   = reduce(
             lambda x, y: x*y,
             [ ufloat(
-                (1.,sys_val / values['value']),
+                1.,
+                sys_val / values['value'],
                 name+'_'+sysname)
                 for sysname, sys_val in values.iteritems()
                 if sysname.startswith('sys_')
@@ -84,7 +85,7 @@ mutau_tables       = dict(
     )
 
 for iso in mutau_tables:
-    mutau_tables[iso]['QCD'] *= ufloat((1,0.1), 'qcd_extrapolation_stat')
+    mutau_tables[iso]['QCD'] *= ufloat(1, 0.1, 'qcd_extrapolation_stat')
 
 ########################################################################################################################################################
 ######################################                                                                            ######################################
@@ -94,8 +95,9 @@ for iso in mutau_tables:
 
 columns            = ('process','Obs. Events','Stat. Err','Exp. Evesnts','Stat. Err.','Sys. Error','Ratio Data/MC (%)', 'Stat. Error', 'Sys. Error','Tau Efficiency', 'Stat. Error', 'Sys. Error')
 cell_spacing       = '%'+str(max([min([int(len(i)*1.5) for i in columns]), 20]))+'s' # % 
-line_format        = cell_spacing*len(columns)+'\n'
-separator          = '-'*20*len(columns)+'\n'
+process_spacing    = '%30s'
+line_format        = process_spacing+cell_spacing*(len(columns)-1)+'\n'
+separator          = '-'*(20*(len(columns)-1) + 30)+'\n'
 toprint            = line_format % columns
 toprint           += separator
 
