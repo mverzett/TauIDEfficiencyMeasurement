@@ -12,9 +12,10 @@ source jobid.sh
 ## done
 ## 
 export jobid=$jobid8
-export datasrc=$(ls -d /scratch/*/data/$jobid | awk -F$jobid '{print $1}')
-./make_proxies.sh
+export datasrc=$hdfs
+#./make_proxies.sh
 for dir in $datasrc; do
+    echo $dir
     rake "meta:getinputs[$jobid, $dir, mm/metaInfo]"
     rake "meta:getmeta[inputs/$jobid, mm/metaInfo, 8]"
 done
