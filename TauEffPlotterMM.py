@@ -20,7 +20,8 @@ from FinalStateAnalysis.PlotTools.PoissonView import PoissonView
 from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, HistStackToTGRaphErrors
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
 from FinalStateAnalysis.MetaData.data_styles import data_styles
-from TauEffPlotterBase import TauEffPlotterBase
+import FinalStateAnalysis.Utilities.prettyjson as prettyjson
+from TauEffPlotterBase import TauEffPlotterBase, remove_name_entry
 import sys
 import os
 import glob
@@ -39,6 +40,7 @@ def quad(*xs):
 class TauEffPlotterMM(TauEffPlotterBase):
     def __init__(self):
         super(TauEffPlotterMM, self).__init__('MM')
+        self.sample_mapping['Zjets_M50'] = 'zmm'
 
     def get_qcd_estimation(self):
         qcd_reg   = 'h2Tau/ss'
@@ -56,7 +58,7 @@ class TauEffPlotterMM(TauEffPlotterBase):
 
         qcd_est  = views.SumView(data_view, neg_zjet)
         qcd_est  = views.SumView(qcd_est  , neg_wjet)
-        qcd_est  = views.StyleView(qcd_est, **data_styles['QCD*'])
+        qcd_est  = views.StyleView(qcd_est, **remove_name_entry(data_styles['QCD*']))
         qcd_est  = views.TitleView(qcd_est, 'QCD')
         return qcd_est
 
@@ -73,7 +75,7 @@ class TauEffPlotterMM(TauEffPlotterBase):
                     self.get_view_dir('WW*' , rebin, folder),
                     self.get_view_dir('ZZ*' , rebin, folder)
                     ),
-                **data_styles['WZ*']
+                **remove_name_entry(data_styles['WZ*'])
             ),
             'diboson'
             )
@@ -132,7 +134,9 @@ class TauEffPlotterMM(TauEffPlotterBase):
         self.add_legend([data_h, stack], leftside, entries=5)
         self.add_cms_blurb(self.sqrts)
         if logscale:
-            self.canvas.SetLogy()
+            self.pad.SetLogy()
+
+        self.add_ratio_plot(data_h, stack, xrange, 0.2)
 
 
     def get_signal_views(self, iso_name, variable):
@@ -140,20 +144,38 @@ class TauEffPlotterMM(TauEffPlotterBase):
         nbins     = self.get_view('Zjets*').Get('/'.join([folder,variable])).GetNbinsX()
         return self.make_folder_views(folder, nbins)
     
+    def map_interesting_directories(self, selection_region, var, himt_region = 'MT70_120'):
+        ret = {}
+        for sign in ['os', 'ss']:
+            ret[sign] = self.map_yields(
+                os.path.join( selection_region, sign ),
+                var
+            )
+        return ret
+
+    def dump_selection_info(self, tauids, var):
+        ret = {}
+        for tau_id in tauids:
+            ret[tau_id] = self.map_interesting_directories(
+                tau_id, 
+                var
+            )
+        return ret
 
 if __name__ <> "__main__":
     sys.exit(0)
 
 jobid = os.environ['jobid']
 toPlot  = {
-    "m1Pt"           : { 'xaxis' : 'p_{#mu_{1} T} (GeV)'   , 'rebin' : 10, 'leftside' : False},
-    "m2Pt"           : { 'xaxis' : 'p_{#mu_{2} T} (GeV)'   , 'rebin' : 10, 'leftside' : False},
+    'nvtx'           : { 'xaxis' : 'N_{vtx}'               , 'rebin' : 1 , 'leftside' : False},
+    "m1Pt"           : { 'xaxis' : 'p_{#mu_{1} T} (GeV)'   , 'rebin' : 2 , 'leftside' : False},
+    "m2Pt"           : { 'xaxis' : 'p_{#mu_{2} T} (GeV)'   , 'rebin' : 2 , 'leftside' : False},
     "m1AbsEta"       : { 'xaxis' : '|#eta|_{#mu_{1}} (GeV)', 'rebin' : 2 , 'leftside' : False, 'xrange' : (0,3)},
     "m2AbsEta"       : { 'xaxis' : '|#eta|_{#mu_{2}} (GeV)', 'rebin' : 2 , 'leftside' : False, 'xrange' : (0,3)},
     "m1_m2_Mass"     : { 'xaxis' : 'M_{#mu#mu} (GeV)'      , 'rebin' : 1 , 'leftside' : False, 'xrange' : (60,120)},
     "nvtx"           : { 'xaxis' : 'Number of vertices'    , 'rebin' : 1 , 'leftside' : False},
     "type1_pfMetEt"  : { 'xaxis' : 'Type 1 MET E_{T} (GeV)', 'rebin' : 2, 'leftside' : False, 'xrange' : (0,90)},
-    "type1_pfMetPhi" : { 'xaxis' : 'Type 1 MET #phi'       , 'rebin' : 1, 'leftside' : False, 'yrange' : (0,230*10**2), 'xrange' : (-3.5,3.5)},
+    "type1_pfMetPhi" : { 'xaxis' : 'Type 1 MET #phi'       , 'rebin' : 1, 'leftside' : False, 'xrange' : (-3.5,3.5)},
     "MET_Z_perp"     : { 'xaxis' : 'Type 1 MET perp. to Z (GeV)', 'rebin' : 2, 'leftside' : False, 'xrange' : (0,80)},
     "MET_Z_para"     : { 'xaxis' : 'Type 1 MET parallel. to Z (GeV)', 'rebin' : 2, 'leftside' : False, 'xrange' : (0,80)},
     }
@@ -179,7 +201,10 @@ for var, kwargs in toPlot.iteritems():
 
 plotter.set_subdir('')
 plotter.write_summary('','m1_m2_Mass')
-#plotter.write_json_dump('m1_m2_Mass')
+
+yield_dump = plotter.dump_selection_info(['h2Tau'], 'm1_m2_Mass')
+with open('results/%s/plots/mm/yield_dump.json' % jobid, 'w') as jfile:
+    jfile.write(prettyjson.dumps(yield_dump) )
             
 #Make QCD region plots
 folder = folder.replace('os','ss')

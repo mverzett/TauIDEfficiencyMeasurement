@@ -21,6 +21,7 @@ from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, 
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
 from FinalStateAnalysis.MetaData.data_styles import data_styles
 from FinalStateAnalysis.StatTools.quad import quad
+from pdb import set_trace
 #from FinalStateAnalysis.Utilities.shelve_wrapper  import make_shelf
 import json
 
@@ -33,9 +34,20 @@ import ROOT
 import fnmatch
 import math
 import systematics
+import logging
 
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptTitle(0)
+
+def remove_name_entry(dictionary):
+    return dict( [ i for i in dictionary.iteritems() if i[0] != 'name'] )
+
+def get_histo_integral(histo):
+    nbins = histo.GetNbinsX()
+    hclone = histo.Clone()
+    hclone.Rebin(nbins)
+    return hclone.GetBinContent(1), hclone.GetBinError(1)
 
 class TauEffPlotterBase(Plotter):
     def __init__(self, channel):
@@ -54,13 +66,21 @@ class TauEffPlotterBase(Plotter):
         self.outputdir    = 'results/%s/plots/%s' % (jobid, channel.lower() )
         self.base_out_dir = self.outputdir
         #pprint.pprint(files)
-        super(TauEffPlotterBase, self).__init__(files, lumifiles, self.outputdir, None)
+        super(TauEffPlotterBase, self).__init__(files, lumifiles, self.outputdir, blinder=None)
         self.mc_samples = filter(lambda x: not x.startswith('data_'), self.samples)
         self.zero_systematics_point = 'NOSYS' if channel=='MT' else ''
         self.systematic = ''
         self.zero_systematic = ''
         self.shape_systematics = []
-        #expressed in %
+        self.sample_mapping = {
+            'WplusJets*' : 'wjets',
+            'Zjets_M50'  : 'ztt'  ,
+            'Zjets_ZToMuMu_M50' : 'zmm',
+            'TTplusJets*' : 'ttbar',
+            'WZ*' : 'wz',
+            'WW*' : 'ww',
+            'ZZ*' : 'zz',
+        }
 
     def get_view(self, *args): #Is it against Liskov Substitution Principle? I don't care
         if self.systematic != '':
@@ -227,6 +247,37 @@ class TauEffPlotterBase(Plotter):
         with open(os.path.join(self.outputdir,'full_content_dump.json'),'w') as out_file:
             out_file.write(json.dumps(store, indent=4, separators=(',', ': ')))
  
-        
-        
+    def get_nicer_name(self, sample):
+        for regex, nicename in self.sample_mapping.iteritems():
+            if fnmatch.fnmatch(sample, regex):
+                return nicename
+        return sample
+
+    def map_yields(self, path, var, systematics_hook=None):
+        samples = self.mc_samples + ['data']
+        fullpath = os.path.join(path, var)
+        ret = {}
+        for sample in samples:
+            #get central values
+            sample_name = self.get_nicer_name(sample)
+            self.systematic = self.zero_systematics_point
+            central_value, stat_err = get_histo_integral(
+                self.get_view(sample).Get(fullpath)
+            )
+            ret[sample_name] = {
+                'val'  : central_value,
+                'stat' : stat_err,
+                }
+            
+            #get sys shifts
+            for sys_shift in self.shape_systematics:
+                sys_name = systematics_hook(sys_shift) if systematics_hook else sys_shift
+                if sys_name: #allows to filter systematics
+                    self.systematic = sys_shift
+                    sys_central, unused = get_histo_integral(
+                        self.get_view(sample).Get(fullpath)
+                    )
+                    sys_err = sys_central - central_value 
+                    ret[sample_name][sys_name] = sys_err
+        return ret
         

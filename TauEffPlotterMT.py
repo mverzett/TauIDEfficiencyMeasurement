@@ -19,9 +19,11 @@ from FinalStateAnalysis.PlotTools.Plotter import Plotter
 from FinalStateAnalysis.PlotTools.PoissonView import PoissonView
 from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, HistStackToTGRaphErrors
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
+import FinalStateAnalysis.Utilities.prettyjson as prettyjson
+from FinalStateAnalysis.PlotTools.decorators import memo
 from FinalStateAnalysis.MetaData.data_styles import data_styles
 from FinalStateAnalysis.StatTools.quad import quad
-from TauEffPlotterBase import TauEffPlotterBase
+from TauEffPlotterBase import TauEffPlotterBase, remove_name_entry
 import itertools
 import sys
 import os
@@ -31,6 +33,7 @@ import ROOT
 import fnmatch
 import math
 import logging
+from pdb import set_trace
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 ROOT.gROOT.SetBatch(True)
@@ -59,14 +62,16 @@ class SystematicsView(object):
 class TauEffPlotterMT(TauEffPlotterBase):
     def __init__(self):
         super(TauEffPlotterMT, self).__init__('MT')
+        self.sample_mapping['Zjets_TauSpinned_*'] = 'ztt_tauspinner'
         self.systematic = 'NOSYS'
         self.zero_systematic = 'NOSYS'
         self.shape_systematics = ['mes_p','tes_p','jes_p','ues_p','qcd_scale_down']
         #set the proper style
         self.views['Zjets_ZToMuMu_M50']['view'] = views.TitleView(
-            views.StyleView(self.views['Zjets_ZToMuMu_M50']['view'], **data_styles['WW*']),
+            views.StyleView(self.views['Zjets_ZToMuMu_M50']['view'], **remove_name_entry(data_styles['WW*'])),
             'Z#rightarrow#mu#mu'
             )
+
 
     def compute_contributions(self, iso_name, himtregion):
         '''uses ABCD method to extrapolate the WJets and QCD yield in SS region. Regions:
@@ -103,7 +108,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
                                 ),
                                 qcd_yield_loMt/qcd_ss_noIso_loMt
                                 )
-                        , **data_styles['QCD*']),
+                        , **remove_name_entry(data_styles['QCD*'])),
                         'QCD'),                        
                 },
             himtregion : {
@@ -117,7 +122,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
                                 ),
                                 qcd_yield_loMt/qcd_ss_noIso_hiMt
                                 )
-                        , **data_styles['QCD*']),
+                        , **remove_name_entry(data_styles['QCD*'])),
                         'QCD'),
                 },
             }
@@ -130,7 +135,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
 
         #qcd contribution
         qcd_view = self.compute_contributions(iso_name, mtregion)[mtregion]['view']
-        qcd_scale= -0.9 if self.systematic == 'qcd_scale_down' else -1.
+        qcd_scale= -(1.06 - 0.1) if self.systematic == 'qcd_scale_down' else -1.06
         qcd_view = views.ScaleView(qcd_view, qcd_scale)
         
         #Scale factor
@@ -140,7 +145,13 @@ class TauEffPlotterMT(TauEffPlotterBase):
         w_scale  = wjets_lo.Integral() / wjets_hi.Integral()
 
         #MC ZJets view
-        neg_zjet = views.ScaleView(self.get_view('Zjets*'),-1)
+        neg_zjet = views.ScaleView(
+            views.SumView(
+                self.get_view('Zjets_M50'),
+                self.get_view('Zjets_ZToMuMu_M50'),
+            ),
+        -1
+        )
         neg_zjet = views.SubdirectoryView(neg_zjet,wjet_reg)
 
         #Data view
@@ -149,7 +160,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         wjet_est = views.SumView(data_view, neg_zjet)
         wjet_est = views.SumView(wjet_est, qcd_view)
         wjet_est = views.ScaleView(wjet_est, w_scale)
-        wjet_est = views.StyleView(wjet_est, **data_styles['WplusJets*'])
+        wjet_est = views.StyleView(wjet_est, **remove_name_entry(data_styles['WplusJets*']))
         wjet_est = views.TitleView(wjet_est, 'WplusJets')
         return wjet_est
 
@@ -157,7 +168,13 @@ class TauEffPlotterMT(TauEffPlotterBase):
         qcd_reg   = '%s/ss/LoMT/' % iso_name
 
         #MC ZJets view
-        neg_zjet = views.ScaleView(self.get_view('Zjets*'),-1)
+        neg_zjet = views.ScaleView(
+            views.SumView(
+                self.get_view('Zjets_M50'),
+                self.get_view('Zjets_ZToMuMu_M50'),
+            ),
+        -1
+        )
         neg_zjet = views.SubdirectoryView(neg_zjet,qcd_reg)
 
         #DATA WJets estimation
@@ -168,11 +185,11 @@ class TauEffPlotterMT(TauEffPlotterBase):
 
         qcd_est  = views.SumView(data_view, neg_zjet)
         qcd_est  = views.SumView(data_view, neg_wjet)
-        qcd_est  = views.StyleView(qcd_est, **data_styles['QCD*'])
+        qcd_est  = views.StyleView(qcd_est, **remove_name_entry(data_styles['QCD*']))
         qcd_est  = views.TitleView(qcd_est, 'QCD')
         return qcd_est
 
-    def make_folder_views(self, folder, rebin, mtregion='HiMT'):
+    def make_folder_views(self, folder, rebin, mtregion='MT70_120'): #'HiMT'
         iso_name    = folder.split('/')[0]
         zjets_mc    = self.get_view_dir('Zjets_M50'  , rebin, folder)
         data        = self.get_view_dir('data'       , rebin, folder)
@@ -186,14 +203,14 @@ class TauEffPlotterMT(TauEffPlotterBase):
                     self.get_view_dir('WW*' , rebin, folder),
                     self.get_view_dir('ZZ*' , rebin, folder)
                     ),
-                **data_styles['WZ*']
+                **remove_name_entry(data_styles['WZ*'])
             ),
             'diboson'
             )
 
         zjets_mc    = views.TitleView(zjets_mc, 'Z#rightarrow#tau#tau')
         zjets_mm_mc = views.TitleView(
-            views.StyleView(zjets_mm_mc, **data_styles['WW*']),
+            views.StyleView(zjets_mm_mc, **remove_name_entry(data_styles['WW*'])),
             'Z#rightarrow#mu#mu'
             )
                 
@@ -201,7 +218,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         wjet_est  = self.rebin_view(self.get_w_estimation(iso_name, mtregion), rebin)
         
         #makes QCD Estimation view
-        qcd_scale = 0.9 if self.systematic == 'qcd_scale_down' else 1.
+        qcd_scale = (1.06 - 0.1) if self.systematic == 'qcd_scale_down' else 1.06
         qcd_est   = views.ScaleView( self.rebin_view(self.get_qcd_estimation(iso_name, mtregion), rebin), qcd_scale)
         return {
             'Z_tautau' : zjets_mc,
@@ -222,7 +239,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         ttbar       = self.get_view_dir('TTplusJets*', rebin, folder)
         zjets_mm_mc = self.get_view_dir('Zjets_ZToMuMu_M50'  , rebin, folder)
         wjets_mc    = self.get_view_dir('WplusJets*',  rebin, folder)
-        qcd_scale   = 0.9 if self.systematic == 'qcd_scale_down' else 1.
+        qcd_scale   = (1.06 - 0.1) if self.systematic == 'qcd_scale_down' else 1.06
         qcd_est     = views.ScaleView(
             self.rebin_view(
                 self.compute_contributions(iso_name, mtregion)[mtregion]['view'],
@@ -235,7 +252,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
                     self.get_view_dir('WW*' , rebin, folder),
                     self.get_view_dir('ZZ*' , rebin, folder)
                     ),
-                **data_styles['WZ*']
+                **remove_name_entry(data_styles['WZ*'])
             ),
             'diboson'
             )
@@ -272,7 +289,7 @@ class TauEffPlotterMT(TauEffPlotterBase):
         qcd_est      = folder_views['QCD'     ]
         data         = folder_views['data'    ]
         
-        stack     = views.StackView(ttbar, diboson, qcd_est, wjet_est,  zjets_mm_mc, zjets_mc).Get(variable)
+        stack     = views.StackView(ttbar, diboson, qcd_est, wjet_est,  zjets_mm_mc, zjets_mc, sorted=True).Get(variable)
         stack.Draw()
         stack.GetHistogram().GetXaxis().SetTitle(xaxis)
         if xrange:
@@ -299,13 +316,63 @@ class TauEffPlotterMT(TauEffPlotterBase):
             
         # Add legend
         self.add_legend([data_h, stack], leftside, entries=5)
+        
+        #if logscale:
+        #    self.pad.SetLogy()
+
+        self.add_ratio_plot(data_h, stack, xrange, 0.2)
+
 
     def get_signal_views(self, iso_name, variable):
         folder    = '%s/os/LoMT' % iso_name
         nbins     = self.get_view('Zjets*').Get('/'.join([folder,variable])).GetNbinsX()
         return self.make_folder_views(folder, nbins)
-        
-        
+
+    @staticmethod
+    @memo
+    def sys_naming(sys):
+        if '_p' in sys:
+            return 'sys_'+sys.replace('_p','')
+        return ''
+
+    def map_interesting_directories(self, tau_id_name, var, himt_region = 'MT70_120'):
+        ret = {
+            'muIso' : {},
+            'muAntiIso' : {},
+        }
+
+        mt_map = {
+            'LoMT' : 'LoMT',
+            'HiMT' : himt_region,
+        }
+        for sign in ['os', 'ss']:
+            ret['muIso'][sign] = {}
+            for mtname, mtreg in mt_map.iteritems():
+                ret['muIso'][sign][mtname] = self.map_yields(
+                    os.path.join( tau_id_name, sign, mtreg ),
+                    var, 
+                    systematics_hook=TauEffPlotterMT.sys_naming
+                )
+
+        ret['muAntiIso']['ss'] = {}
+        for mtname, mtreg in mt_map.iteritems():
+            ret['muAntiIso']['ss'][mtname] = self.map_yields(
+                os.path.join( 'QCD', 'ss', mtreg ),
+                var, 
+                systematics_hook=TauEffPlotterMT.sys_naming
+            )
+        return ret
+
+    def dump_tauids_info(self, tauids, var, himt_region = 'MT70_120'):
+        ret = {}
+        for tau_id in tauids:
+            ret[tau_id] = self.map_interesting_directories(
+                tau_id, 
+                var, 
+                himt_region
+            )
+        return ret
+
 if __name__ <> "__main__":
     sys.exit(0)
 
@@ -326,19 +393,61 @@ print '\n\nPlotting MT\n\n'
 #pprint.pprint(plotter.views)
 
 ids =  [
-            'LooseIso'    ,
-            ## 'MediumIso'   ,
-            ## 'TightIso'    , 
-            ## 'LooseMVAIso' ,
-            ## 'MediumMVAIso',
-            ## 'TightMVAIso' ,
-            ## 'LooseIso3Hits',
-            ## 'LooseMVA2Iso',
-            ## 'MediumIso3Hits',
-            ## 'MediumMVA2Iso',
-            ## 'TightIso3Hits',
-            ## 'TightMVA2Iso',
-            ## 'VLooseIso',
+    #'VLooseIso' 	           ,
+    #'LooseIso'  	           ,
+    #'MediumIso' 	           ,
+    #'TightIso'  	           ,
+    'LooseIso3Hits'                ,
+    #'LooseIso3HitsAntiEleLoose'    ,
+    #'LooseIso3HitsAntiEleMVAVLoose',
+    #'LooseIso3HitsAntiEleMVALoose' ,
+    #'LooseIso3HitsAntiEleMVAMedium',
+    'LooseIso3HitsAntiEleMVATight' ,
+    #'LooseIso3HitsAntiMuon3Tight'  ,
+    'LooseIso3HitsAntiMuonMVATight',
+    #'MediumIso3Hits' 	           ,
+    #'TightIso3Hits'                ,
+    #'VLooseIsoMVA3OldDMNoLT'       ,
+    #'LooseIsoMVA3OldDMNoLT'        ,
+    #'MediumIsoMVA3OldDMNoLT'       ,
+    #'TightIsoMVA3OldDMNoLT'        ,
+    #'VTightIsoMVA3OldDMNoLT'       ,
+    #'VVTightIsoMVA3OldDMNoLT'      ,
+    #'VLooseIsoMVA3OldDMLT'         ,
+    #'LooseIsoMVA3OldDMLT'          ,
+    #'MediumIsoMVA3OldDMLT'         ,
+    #'TightIsoMVA3OldDMLT'          ,
+    #'VTightIsoMVA3OldDMLT'         ,
+    #'VVTightIsoMVA3OldDMLT'        ,
+    ]
+
+ids_all =  [
+    'VLooseIso' 	           ,
+    'LooseIso'  	           ,
+    'MediumIso' 	           ,
+    'TightIso'  	           ,
+    'LooseIso3Hits'                ,
+    'LooseIso3HitsAntiEleLoose'    ,
+    'LooseIso3HitsAntiEleMVAVLoose',
+    'LooseIso3HitsAntiEleMVALoose' ,
+    'LooseIso3HitsAntiEleMVAMedium',
+    'LooseIso3HitsAntiEleMVATight' ,
+    'LooseIso3HitsAntiMuon3Tight'  ,
+    'LooseIso3HitsAntiMuonMVATight',
+    'MediumIso3Hits' 	           ,
+    'TightIso3Hits'                ,
+    'VLooseIsoMVA3OldDMNoLT'       ,
+    'LooseIsoMVA3OldDMNoLT'        ,
+    'MediumIsoMVA3OldDMNoLT'       ,
+    'TightIsoMVA3OldDMNoLT'        ,
+    'VTightIsoMVA3OldDMNoLT'       ,
+    'VVTightIsoMVA3OldDMNoLT'      ,
+    'VLooseIsoMVA3OldDMLT'         ,
+    'LooseIsoMVA3OldDMLT'          ,
+    'MediumIsoMVA3OldDMLT'         ,
+    'TightIsoMVA3OldDMLT'          ,
+    'VTightIsoMVA3OldDMLT'         ,
+    'VVTightIsoMVA3OldDMLT'        ,
     ]
 
 #Make Ztt WJets and TTbar region plots
@@ -346,9 +455,10 @@ for iso in ids:
     region = 'LoMT'
     for var, kwargs in toPlot.iteritems():
         folder = '/'.join([iso,'os',region])
-        plotter.set_subdir(os.path.join(iso, 'signal'))
+        plotter.set_subdir(os.path.join(iso, 'signal', 'mc_data'))
         plotter.plot_mc_vs_data(folder, var, **kwargs)
         plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+        plotter.set_subdir(os.path.join(iso, 'signal'))
         plotter.plot_with_estimate(folder, var, **kwargs)
         plotter.save('final_data_os_%s_%s_%s' % (iso, region, var) )
     plotter.set_subdir(iso)
@@ -362,10 +472,11 @@ for iso in ids:
             ]:
         first = True
         for var, kwargs in toPlot.iteritems():
-            plotter.set_subdir(os.path.join(iso, dirname))
             folder = '/'.join([iso,'os',region])
-            plotter.plot_mc_vs_data(folder, var, **kwargs)
+            plotter.set_subdir(os.path.join(iso, dirname, 'mc_data'))
+            plotter.plot_mc_vs_data(folder, var, sort=True, **kwargs)
             plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+            plotter.set_subdir(os.path.join(iso, dirname))
             obs_evt, exp_evt = plotter.plot_wjets_region(folder, var, **kwargs)
             plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
             if first:
@@ -375,7 +486,10 @@ for iso in ids:
 
 
 plotter.set_subdir('')
-#plotter.write_json_dump('m_t_Mass')
+print 'making json dump'
+yield_dump = plotter.dump_tauids_info(ids_all, 'm_t_Mass')
+with open('results/%s/plots/mt/yield_dump.json' % jobid, 'w') as jfile:
+    jfile.write(prettyjson.dumps(yield_dump) )
 
 
 #Make QCD region plots
