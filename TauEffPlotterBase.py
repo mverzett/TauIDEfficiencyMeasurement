@@ -39,6 +39,7 @@ import logging
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptTitle(0)
+ROOT.gStyle.SetOptStat(0)
 
 def remove_name_entry(dictionary):
     return dict( [ i for i in dictionary.iteritems() if i[0] != 'name'] )
