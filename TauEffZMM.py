@@ -58,14 +58,30 @@ class TauEffZMM(TauEffBase):
         #self.book(directory, "prescale", "HLT prescale", 21, -0.5, 20.5)
         self.book(directory, "m1Pt", "Muon 1 Pt", 100, 0, 100)
         self.book(directory, "m2Pt", "Muon 2 Pt", 100, 0, 100)
-        self.book(directory, "m1MtToMET", "Muon 1 eta", 120, 0, 120)
         self.book(directory, "m1AbsEta", "Muon 1 eta", 100, 0, 5)
         self.book(directory, "m2AbsEta", "Muon 2 eta", 100, 0, 5)
         self.book(directory, "m1_m2_Mass", "Muon 1-2 Mass", 300, 0, 300)
 
         #MET "certification"
-        self.book(directory, "type1_pfMetEt" , "type1_pfMetEt" , 200, 0, 200)
-        self.book(directory, "type1_pfMetPhi", "type1_pfMetPhi", 100, -7, 7)
+        self.book(directory, "pfMetEt" , "type1_pfMetEt" , 200, 0, 200)
+        self.book(directory, "pfMetEt_mes"  , "type1_pfMetEt" , 200, 0, 200)
+        self.book(directory, "pfMetEt_tes"  , "type1_pfMetEt" , 200, 0, 200)
+        self.book(directory, "pfMetEt_jes"  , "type1_pfMetEt" , 200, 0, 200)
+        self.book(directory, "pfMetEt_ues"  , "type1_pfMetEt" , 200, 0, 200)
+
+        self.book(directory, "pfMetPhi", "type1_pfMetPhi", 100, -7, 7)
+        self.book(directory, "pfMetPhi_mes" , "type1_pfMetPhi", 100, -7, 7)
+        self.book(directory, "pfMetPhi_tes" , "type1_pfMetPhi", 100, -7, 7)
+        self.book(directory, "pfMetPhi_jes" , "type1_pfMetPhi", 100, -7, 7)
+        self.book(directory, "pfMetPhi_ues" , "type1_pfMetPhi", 100, -7, 7)
+
+        self.book(directory, "m1MtToPfMET"    , "Muon 1 MT", 120, 0, 120)
+        self.book(directory, "m1MtToPfMET_mes", "Muon 1 MT", 120, 0, 120)
+        self.book(directory, "m1MtToPfMET_tes", "Muon 1 MT", 120, 0, 120)
+        self.book(directory, "m1MtToPfMET_jes", "Muon 1 MT", 120, 0, 120)
+        self.book(directory, "m1MtToPfMET_ues", "Muon 1 MT", 120, 0, 120)
+        self.book(directory, "m1MtToPfMET_ees", "Muon 1 MT", 120, 0, 120)
+
         self.book(directory, "MET_Z_perp", "MET_Z_perp", 200, 0, 200)
         self.book(directory, "MET_Z_para", "MET_Z_para", 200, 0, 200)
 
