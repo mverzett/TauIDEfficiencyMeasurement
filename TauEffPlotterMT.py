@@ -21,7 +21,7 @@ from FinalStateAnalysis.PlotTools.HistToTGRaphErrors import HistToTGRaphErrors, 
 from FinalStateAnalysis.PlotTools.InflateErrorView import InflateErrorView
 import FinalStateAnalysis.Utilities.prettyjson as prettyjson
 from FinalStateAnalysis.PlotTools.decorators import memo
-from FinalStateAnalysis.MetaData.data_styles import data_styles
+from FinalStateAnalysis.MetaData.data_styles import data_styles, colors
 from FinalStateAnalysis.StatTools.quad import quad
 from TauEffPlotterBase import TauEffPlotterBase, remove_name_entry
 import itertools
@@ -38,6 +38,7 @@ from pdb import set_trace
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptTitle(0)
+ROOT.gStyle.SetOptStat(0)
 
 class SystematicsView(object):
     def __init__(self, central_view, *systematics_views):
@@ -372,9 +373,66 @@ class TauEffPlotterMT(TauEffPlotterBase):
                 himt_region
             )
         return ret
+    
+    def plot_spinner_plots(self, tauId, var, rebin=1, xaxis='', **kwargs):
+        signal_region = os.path.join(tauId, 'os/LoMT')
+        ztt_view      = self.get_view_dir('Zjets_M50'  , rebin, signal_region)
+        spinned_view  = self.get_view_dir('Zjets_TauSpinned_M50'  , rebin, signal_region)
+        
+        ztt_view = views.TitleView(
+            views.StyleView(
+                ztt_view,
+                fillcolor = 0,
+                linewidth = 2,
+                fillstyle = 0,
+                legendstyle = 'l'
+            ),
+            'w/o TauSpinner'
+        )
 
+        spinned_view = views.TitleView(
+            views.StyleView(
+                spinned_view,
+                fillcolor = 0,
+                fillstyle = 0,
+                linewidth = 2,
+                linecolor = colors['blue'],
+                legendstyle = 'l'
+            ),
+            'w/ TauSpinner'
+        )
+
+        ztt_h = ztt_view.Get(var)
+        ztt_h.GetXaxis().SetTitle(xaxis)
+        spinned_h = spinned_view.Get(var)
+
+        # Make sure we can see everything
+        max_y = max(ztt_h.GetMaximum(), spinned_h.GetMaximum())
+        ztt_h.GetYaxis().SetRangeUser(0., 1.2*max_y)
+
+        ztt_h.Draw()
+        spinned_h.Draw('same')
+        self.keep.append(ztt_h)
+        self.keep.append(spinned_h)
+        self.add_cms_blurb(self.sqrts)
+
+        # Add legend
+        self.add_legend([ztt_h, spinned_h], False, entries=2)
+        
+        self.add_ratio_plot(ztt_h, spinned_h, None, 0.2)
+
+        
 if __name__ <> "__main__":
     sys.exit(0)
+
+from optparse import OptionParser
+parser = OptionParser(description=__doc__)
+
+parser.add_option('--no-full-plots', action='store_true', dest='no_full_plots', default = False)
+parser.add_option('--no-json'      , action='store_true', dest='no_json'      , default = False)
+parser.add_option('--no-tauspinner', action='store_true', dest='no_tauspinner', default = False)
+
+options,NOTUSED = parser.parse_args()
 
 jobid = os.environ['jobid']
 toPlot  = {
@@ -383,7 +441,8 @@ toPlot  = {
     "mAbsEta"  : { 'xaxis' : '|#eta|_{#mu} (GeV)'     , 'rebin' : 10, 'leftside' : False},
     "tAbsEta"  : { 'xaxis' : '|#eta|_{#tau_{h}} (GeV)', 'rebin' : 10, 'leftside' : False},
     "m_t_Mass" : { 'xaxis' : 'M_{#mu#tau_{h}} (GeV)'  , 'rebin' : 5 , 'leftside' : False},
-    "nvtx"       : { 'xaxis' : 'Number of vertices'    , 'rebin' : 1 , 'leftside' : False},
+    "nvtx"     : { 'xaxis' : 'Number of vertices'     , 'rebin' : 1 , 'leftside' : False},
+    "mMtToPfMet_Ty1" : {'xaxis' : 'M_{T}(#mu, MET)'   , 'rebin' : 10, 'leftside' : False}
     }
 
 plotter = TauEffPlotterMT()
@@ -393,32 +452,9 @@ print '\n\nPlotting MT\n\n'
 #pprint.pprint(plotter.views)
 
 ids =  [
-    #'VLooseIso' 	           ,
-    #'LooseIso'  	           ,
-    #'MediumIso' 	           ,
-    #'TightIso'  	           ,
     'LooseIso3Hits'                ,
-    #'LooseIso3HitsAntiEleLoose'    ,
-    #'LooseIso3HitsAntiEleMVAVLoose',
-    #'LooseIso3HitsAntiEleMVALoose' ,
-    #'LooseIso3HitsAntiEleMVAMedium',
     'LooseIso3HitsAntiEleMVATight' ,
-    #'LooseIso3HitsAntiMuon3Tight'  ,
     'LooseIso3HitsAntiMuonMVATight',
-    #'MediumIso3Hits' 	           ,
-    #'TightIso3Hits'                ,
-    #'VLooseIsoMVA3OldDMNoLT'       ,
-    #'LooseIsoMVA3OldDMNoLT'        ,
-    #'MediumIsoMVA3OldDMNoLT'       ,
-    #'TightIsoMVA3OldDMNoLT'        ,
-    #'VTightIsoMVA3OldDMNoLT'       ,
-    #'VVTightIsoMVA3OldDMNoLT'      ,
-    #'VLooseIsoMVA3OldDMLT'         ,
-    #'LooseIsoMVA3OldDMLT'          ,
-    #'MediumIsoMVA3OldDMLT'         ,
-    #'TightIsoMVA3OldDMLT'          ,
-    #'VTightIsoMVA3OldDMLT'         ,
-    #'VVTightIsoMVA3OldDMLT'        ,
     ]
 
 ids_all =  [
@@ -450,56 +486,86 @@ ids_all =  [
     'VVTightIsoMVA3OldDMLT'        ,
     ]
 
-#Make Ztt WJets and TTbar region plots
-for iso in ids:
-    region = 'LoMT'
-    for var, kwargs in toPlot.iteritems():
-        folder = '/'.join([iso,'os',region])
-        plotter.set_subdir(os.path.join(iso, 'signal', 'mc_data'))
-        plotter.plot_mc_vs_data(folder, var, **kwargs)
-        plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
-        plotter.set_subdir(os.path.join(iso, 'signal'))
-        plotter.plot_with_estimate(folder, var, **kwargs)
-        plotter.save('final_data_os_%s_%s_%s' % (iso, region, var) )
-    plotter.set_subdir(iso)
-    plotter.write_summary(iso,'m_t_Mass')
-    #plotter.write_summary(iso,'mAbsEta')
+def spinStyler(histo):
+    histo.fillcolor = 0
+    histo.fillstyle = 0
+    histo.linewidth = 2
+    histo.linecolor = colors['blue']
+    histo.legendstyle = 'l'
 
-    for region, dirname in [
-            ('HiMT', 'MT_Greater_40'),
-            ('VHiMT', 'MT_Greater_70'),
-            ('MT70_120', 'MT_70_120'),
-            ]:
-        first = True
+
+#TauSpinner Plots
+if not options.no_tauspinner:
+    spin_plots = {"weight"     : { 'xaxis' : 'mc weight'     , 'rebin' : 2 , 'leftside' : False}}
+    spin_plots.update(toPlot)
+    
+    plotter.set_subdir(os.path.join('tauSpinner'))
+    for var, kwargs in spin_plots.iteritems():
+        plotter.plot_spinner_plots('LooseIso3HitsAntiMuonMVATight', var, **kwargs)
+        plotter.save('mc_comparison_%s' % var )
+
+    plotter.plot(
+        'Zjets_TauSpinned_M50', 
+        'NOSYS/LooseIso3HitsAntiMuonMVATight/os/LoMT/tauSpinnerWeight',
+        drawopt='', 
+        rebin=2, 
+        styler=spinStyler, 
+        xaxis='Tau Spinner weight'
+    )
+    plotter.save('mc_comparison_TauSpinnerWeight' )
+    
+
+#Make Ztt WJets and TTbar region plots
+if not options.no_full_plots:
+    for iso in ids:
+        region = 'LoMT'
         for var, kwargs in toPlot.iteritems():
             folder = '/'.join([iso,'os',region])
-            plotter.set_subdir(os.path.join(iso, dirname, 'mc_data'))
-            plotter.plot_mc_vs_data(folder, var, sort=True, **kwargs)
+            plotter.set_subdir(os.path.join(iso, 'signal', 'mc_data'))
+            plotter.plot_mc_vs_data(folder, var, **kwargs)
             plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
-            plotter.set_subdir(os.path.join(iso, dirname))
-            obs_evt, exp_evt = plotter.plot_wjets_region(folder, var, **kwargs)
-            plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
-            if first:
-                print '%s: observed events: %.0f expected: %.1f ratio: %.3f' % (dirname, obs_evt, exp_evt, obs_evt/ exp_evt)
-                first=False
+            plotter.set_subdir(os.path.join(iso, 'signal'))
+            plotter.plot_with_estimate(folder, var, **kwargs)
+            plotter.save('final_data_os_%s_%s_%s' % (iso, region, var) )
+        plotter.set_subdir(iso)
+        plotter.write_summary(iso,'m_t_Mass')
+        #plotter.write_summary(iso,'mAbsEta')
+
+        for region, dirname in [
+                ('HiMT', 'MT_Greater_40'),
+                ('VHiMT', 'MT_Greater_70'),
+                ('MT70_120', 'MT_70_120'),
+                ]:
+            first = True
+            for var, kwargs in toPlot.iteritems():
+                folder = '/'.join([iso,'os',region])
+                plotter.set_subdir(os.path.join(iso, dirname, 'mc_data'))
+                plotter.plot_mc_vs_data(folder, var, sort=True, **kwargs)
+                plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+                plotter.set_subdir(os.path.join(iso, dirname))
+                obs_evt, exp_evt = plotter.plot_wjets_region(folder, var, **kwargs)
+                plotter.save('final_os_%s_%s_%s' % (iso, region, var) )
+                if first:
+                    print '%s: observed events: %.0f expected: %.1f ratio: %.3f' % (dirname, obs_evt, exp_evt, obs_evt/ exp_evt)
+                    first=False
             
+    #Make QCD region plots
+    for iso in ids:
+        region = 'LoMT'
+        for var, kwargs in toPlot.iteritems():
+            folder = '/'.join([iso,'ss',region])
+            plotter.set_subdir('/'.join([iso,'qcd']))
+            plotter.plot_mc_vs_data(folder, var, **kwargs)
+            plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
+
+if not options.no_json:
+    plotter.set_subdir('')
+    print 'making json dump'
+    yield_dump = plotter.dump_tauids_info(ids_all, 'm_t_Mass')
+    with open('results/%s/plots/mt/yield_dump.json' % jobid, 'w') as jfile:
+        jfile.write(prettyjson.dumps(yield_dump) )
 
 
-plotter.set_subdir('')
-print 'making json dump'
-yield_dump = plotter.dump_tauids_info(ids_all, 'm_t_Mass')
-with open('results/%s/plots/mt/yield_dump.json' % jobid, 'w') as jfile:
-    jfile.write(prettyjson.dumps(yield_dump) )
-
-
-#Make QCD region plots
-for iso in ids:
-    region = 'LoMT'
-    for var, kwargs in toPlot.iteritems():
-        folder = '/'.join([iso,'ss',region])
-        plotter.set_subdir('/'.join([iso,'qcd']))
-        plotter.plot_mc_vs_data(folder, var, **kwargs)
-        plotter.save('mc_vs_data_os_%s_%s_%s' % (iso, region, var) )
 
 integral_ss = sum([plotter.views['data']['view'].Get('NOSYS/QCD/ss/%s/mPt' % m).Integral() for m in ['LoMT']])
 integral_os = sum([plotter.views['data']['view'].Get('NOSYS/QCD/os/%s/mPt' % m).Integral() for m in ['LoMT']])
