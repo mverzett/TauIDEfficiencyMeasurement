@@ -21,6 +21,23 @@ import pprint
 def getHist(dire , name):
     return '/'.join([dire,name])
 
+sys_name_mapping = {
+    'NOSYS': '',
+    ''     : '',
+    'mes_p': 'mes',
+    'tes_p': 'tes',
+    'jes_p': 'jes',
+    'ues_p': 'ues',
+}
+
+@memo
+def getsysattrname(name, sys):
+    return name + '_' + sys_name_mapping[sys]
+
+def getsysattr(row, name, sys):
+    return getattr(row, getsysattrname(name, sys) )
+
+
 ################################################################################
 #### MC-DATA and PU corrections ################################################
 ################################################################################
@@ -101,9 +118,11 @@ class TauEffZMT(TauEffBase):
             }
         
         self.id_functions_with_sys = {
-            'is_MT_Low'  : self.is_MT_Low,
-            'is_MT_really_high': self.is_MT_really_high,
-            'is_MT_in_70_120' : self.is_MT_in_70_120,
+            'HiMT'     : self.HiMT    ,
+            'LoMT'     : self.LoMT    , 
+            'VHiMT'    : self.VHiMT   , 
+            'MT70_120' : self.MT70_120,
+            'MTLt40'   : self.MTLt40  ,
             }
 
 
@@ -111,54 +130,21 @@ class TauEffZMT(TauEffBase):
         flag_map = {}
         systematics = self.systematics if not os.environ['megatarget'].startswith('data_') else self.systematics[0] #for data no shifting sys applied, save time!
         for systematic in self.systematics:
-            for obj_id_name in self.objId:
+            for obj_id_name in self.objId + ['QCD']:
                 for sign in ['ss', 'os']:
-                    for mt in ['HiMT','LoMT']:
-                        flag_map['/'.join((systematic,obj_id_name, sign, 'QCD', mt))] = {
-                            obj_id_name      : True            ,
-                            'sign_cut'       : (sign == 'os')  ,
-                            'is_MT_Low'      : (mt   == 'LoMT'),
-                            'is_mu_anti_iso' : True            ,
-                            }
-                        flag_map['/'.join((systematic,obj_id_name, sign, mt))] = {
-                            obj_id_name : True            ,
-                            'sign_cut'  : (sign == 'os')  ,
-                            'is_MT_Low' : (mt   == 'LoMT'),
-                            'muon_id'   : True            ,
-                            }
-                                    #make a sideband with very high mt > 70 to have a pure sample of w+jets
-                    flag_map['/'.join((systematic,obj_id_name, sign, 'VHiMT'))] = {
-                        obj_id_name : True,
-                        'sign_cut'    : True,
-                        'is_MT_really_high' : True,
+                    for mt in ['HiMT', 'LoMT', 'MTLt40', 'VHiMT', 'MT70_120']:
+                        region_name = '/'.join((systematic,obj_id_name, sign, mt))
+                        region_dict = { 
+                            'sign_cut' : (sign == 'os'), 
+                            mt         : True,
                         }
-                    flag_map['/'.join((systematic,obj_id_name, sign, 'MT70_120'))] = {
-                        obj_id_name : True,
-                        'sign_cut'    : True,
-                        'is_MT_in_70_120' : True,
-                        }
-                    
-            for sign in ['ss', 'os']:
-                for mt in ['HiMT','LoMT']:
-                    #Make two region QCD dominated (anti-isolate the muon)
-                    flag_map['/'.join((systematic, 'QCD', sign, mt))] = {
-                        'LooseIso'       : False         ,
-                        'sign_cut'       : (sign == 'os'),
-                        'is_MT_Low'      : (mt   == 'LoMT'),
-                        'is_mu_anti_iso' : True,
-                        }
-                    flag_map['/'.join((systematic, 'QCD', sign, 'VHiMT'))] = {
-                        'LooseIso'       : False         ,
-                        'sign_cut'       : (sign == 'os'),
-                        'is_mu_anti_iso' : True,
-                        'is_MT_really_high' : True,
-                        }
-                    flag_map['/'.join((systematic, 'QCD', sign, 'MT70_120'))] = {
-                        'LooseIso'       : False         ,
-                        'sign_cut'       : (sign == 'os'),
-                        'is_mu_anti_iso' : True,
-                        'is_MT_in_70_120' : True,
-                        }
+                        if obj_id_name == 'QCD':
+                            region_dict['LooseIso'] = False
+                            region_dict['is_mu_anti_iso'] = True
+                        else:
+                            region_dict[obj_id_name] = True
+                            region_dict['muon_id']   = True
+                        flag_map[region_name] = region_dict
         return flag_map
 
 
@@ -181,6 +167,10 @@ class TauEffZMT(TauEffBase):
         self.book(directory, 'muVetoPt5', 'Number of extra muons', 5, -0.5, 4.5)
         self.book(directory, 'tauVetoPt20Loose3HitsVtx', 'Number of extra taus', 5, -0.5, 4.5)
         self.book(directory, 'eVetoCicTightIso', 'Number of extra CiC tight electrons', 5, -0.5, 4.5)
+
+        if 'TauSpinned' in os.environ['megatarget']:
+            #print 'booking tauSpinnerWeight'
+            self.book(directory, 'tauSpinnerWeight', 'Tau spinner weight', 250, 0, 5)
             
     def event_weight(self, row):
         if row.run > 2:
@@ -212,15 +202,36 @@ class TauEffZMT(TauEffBase):
         else:
             raise KeyError("the current systematic, %s is not recognized" % currect_systematic)
 
-    def is_MT_Low(self, row, currect_systematic):
-        return self.is_MT_Less_than(row, 20, currect_systematic) #row.mMtToPfMet_Ty1 < 20 # #FIXME:BUGFINDING
+    def pZeta(self, row, value, currect_systematic):
+        if currect_systematic == 'NOSYS' or currect_systematic == '':
+            return row.mMtToPfMet_Ty1 < value
+        elif currect_systematic == 'RAW':
+            return row.mMtToMET < value
+        elif currect_systematic == 'mes_p':
+            return row.mMtToPfMet_mes < value
+        elif currect_systematic == 'tes_p':
+            return row.mMtToPfMet_tes < value
+        elif currect_systematic == 'jes_p':
+            return row.mMtToPfMet_jes < value
+        elif currect_systematic == 'ues_p':
+            return row.mMtToPfMet_ues < value
+        else:
+            raise KeyError("the current systematic, %s is not recognized" % currect_systematic)
 
-    def is_MT_really_high(self, row, currect_systematic):
-        return not self.is_MT_Less_than( row, 70, currect_systematic) #row.mMtToPfMet_Ty1 > 70 # #FIXME:BUGFINDING
+    def LoMT(self, row, sys):
+        return getsysattr(row, 'mMtToPfMET', sys) < 20
 
-    def is_MT_in_70_120(self, row, currect_systematic):
-        return (not self.is_MT_Less_than( row, 70, currect_systematic)) and \
-            self.is_MT_Less_than( row, 120, currect_systematic)
+    def HiMT(self, row, currect_systematic):
+        return getsysattr(row, 'mMtToPfMET', sys) >= 20
+
+    def VHiMT(self, row, currect_systematic):
+        return getsysattr(row, 'mMtToPfMET', sys) >= 70
+
+    def MT70_120(self, row, currect_systematic):
+        return 70 <= getsysattr(row, 'mMtToPfMET', sys) < 120
+
+    def MTLt40(self, row, currect_systematic):
+        return getsysattr(row, 'mMtToPfMET', sys) < 40
 
     def muon_id(self, row):
         return selections.mu_idIso(row, 'm') 
