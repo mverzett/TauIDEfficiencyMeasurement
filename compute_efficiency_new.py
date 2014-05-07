@@ -222,7 +222,7 @@ def compute_signal_contribution(yields):
 
 
 def compute_mm_contribution(yields):
-    yields.os.qcd = yields.ss.data - (
+    qcd_est = yields.ss.data - (
         yields.ss.wjets +
         yields.ss.ttbar +
         yields.ss.zmm   +
@@ -230,7 +230,9 @@ def compute_mm_contribution(yields):
         yields.ss.ww    +
         yields.ss.zz    
         )
+    qcd_est *= sys_value_map['sys_qcdSS/OS']
 
+    yields.os.qcd = qcd_est
     yields.os.bkg_sum = (
         yields.os.qcd   +
         yields.os.wjets +
@@ -344,6 +346,22 @@ max_space  = [int(max(i)*1.2) for i in transposed]
 tot_space = sum(max_space)
 separator = '-'*tot_space
 formatter = ''.join(['%'+str(i)+'s' for i in max_space])
+tex_form  = ' &'.join(['%'+str(i)+'s' for i in max_space])+r' \\'
+tex_sep   = r'\hline'
+
+def tex_preamble(cols,ttype='table'): 
+    return r'''
+\begin{%s}
+\begin{center}
+\begin{tabular}{|%s|}
+''' % (ttype, '|'.join(['c']*cols))
+
+tex_end = r'''
+\end{tabular}
+\end{center}
+\end{%s}
+'''
+
 
 with open('results/%s/plots/efficiencies.raw_txt' % jobid,'w') as outfile:
     outfile.write( separator+'\n')
@@ -354,6 +372,18 @@ with open('results/%s/plots/efficiencies.raw_txt' % jobid,'w') as outfile:
     for row in rows[2:]:
         outfile.write( formatter % row+'\n')
     outfile.write( separator+'\n')
+
+with open('results/%s/plots/efficiencies.tex' % jobid,'w') as outfile:
+    outfile.write( tex_preamble(len(rows[0]), 'sidewaystable') )
+    outfile.write( tex_sep+'\n')
+    outfile.write( (tex_form % rows[0]).replace('%', r'\%')+'\n')
+    outfile.write( tex_sep+'\n')
+    outfile.write( (tex_form % rows[1]).replace('+/-', '$\\pm$')+'\n')
+    outfile.write( tex_sep+'\n')
+    for row in rows[2:]:
+        outfile.write( (tex_form % row).replace('+/-', '$\\pm$')+'\n')
+    outfile.write( tex_sep+'\n')
+    outfile.write( tex_end % 'sidewaystable')
 
 ###########################################
 ##       Single eff tables               ##
@@ -400,27 +430,55 @@ for tid in ids:
             )
         )
     sys_breakdown.sort(reverse=True, key=lambda x: x[1])
+    tex_print = tex_preamble(2)
     to_print = []
     to_print.append(separator)
+    tex_print += '\\hline\n'
     to_print.append(tid)
+    tex_print += (r'\multicolumn{2}{|c|}{%s} \\' % tid)+'\n'
     to_print.append(format_ufloat(signal_region.eff_ratio, '%.3f' ))
+    tex_print += (
+        (r'\multicolumn{2}{|c|}{$%s$} \\' % format_ufloat(
+            signal_region.eff_ratio, '%.3f' 
+        )
+     )+'\n').replace('+/-', '\\pm')
     to_print.append(separator)
+    tex_print += '\\hline\n'
     to_print.append('Systematics breakdown')
+    tex_print += (r'\multicolumn{2}{|c|}{Systematics breakdown} \\')+'\n'
+    tex_print += '\\hline\n'
     for label, value in sys_breakdown:
         to_print.append('%20s%8s' % (label, '%.3f' % value))
+        tex_print += (r'%20s & $%s$ \\' % (label, '%.3f' % value) +'\n').replace('+/-', '\\pm')
     to_print.append(separator)
+    tex_print += '\\hline\n'
     to_print.append('Sample breakdown')
+    tex_print += (r'\multicolumn{2}{|c|}{Sample breakdown} \\')+'\n'
+    tex_print += '\\hline\n'
     for sample in signal_samples:
         to_print.append(
             '%20s%24s' % (
-                sample, 
+                sample.replace('_',' '), 
                 format_ufloat(
                     getattr(signal_region, sample)
                 )
             )
         )
+        tex_print += (r'%20s & $%s$ \\' % (
+            sample.replace('_',' '), 
+            format_ufloat(
+                getattr(signal_region, sample)
+            )
+        )).replace('+/-', '\\pm')
+        tex_print += '\n'
+
     to_print.append(separator)
+    tex_print += '\\hline\n'
     to_print.append('')
+    tex_print += tex_end % 'table'
 
     with open(os.path.join(tables_dir, '%s.raw_txt' % tid), 'w') as tid_summary:
         tid_summary.write('\n'.join(to_print))
+
+    with open(os.path.join(tables_dir, '%s.tex' % tid), 'w') as tid_summary:
+        tid_summary.write(tex_print)
